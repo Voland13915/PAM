@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/mock_data.dart';
 import '../widgets/product_card.dart';
 
@@ -81,8 +82,13 @@ class CatalogScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               itemCount: mockProducts.length,
               separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemBuilder: (context, index) =>
-                  ProductCard(product: mockProducts[index]),
+              itemBuilder: (context, index) {
+                final product = mockProducts[index];
+                return ProductCard(
+                  product: product,
+                  onTap: () => context.push('/catalog/${product.id}'),
+                );
+              },
             ),
           ),
         ],

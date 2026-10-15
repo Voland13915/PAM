@@ -1,7 +1,5 @@
-// screens/wishlist_screen.dart
-// Избранное: товары, за ценой которых пользователь следит,
-// с желаемой ценой и отметкой, если она достигнута.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/mock_data.dart';
 import '../utils/formatters.dart';
 import '../widgets/product_card.dart';
@@ -35,6 +33,7 @@ class WishlistScreen extends StatelessWidget {
                 final product = productById(item.productId);
                 return ProductCard(
                   product: product,
+                  onTap: () => context.push('/wishlist/${product.id}'),
                   footer: _TargetPriceInfo(
                     targetPrice: item.targetPrice,
                     reached: product.bestOffer.price <= item.targetPrice,
