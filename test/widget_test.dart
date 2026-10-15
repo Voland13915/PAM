@@ -1,11 +1,19 @@
-// test/widget_test.dart — заменяет тест-счётчик из шаблона flutter create
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tech_price/main.dart';
 
 void main() {
-  testWidgets('Стартовое меню показывает экраны', (tester) async {
+  testWidgets('Приложение стартует на экране входа', (tester) async {
     await tester.pumpWidget(const MyApp());
-    expect(find.text('Каталог'), findsOneWidget);
-    expect(find.text('Профиль'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Войти'), findsOneWidget);
+  });
+
+  testWidgets('Пустой вход показывает ошибки', (tester) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Войти'));
+    await tester.pump();
+    expect(find.text('Введите e-mail'), findsOneWidget);
+    expect(find.text('Введите пароль'), findsOneWidget);
   });
 }
