@@ -1,8 +1,5 @@
-// screens/shopping_list_screen.dart
-// Список покупок: выбранные товары, итог и где что выгоднее купить.
-// Упрощённая версия: каждый товар — в магазине с минимальной ценой.
-// Оптимальное распределение с учётом маршрута (графы) — часть диплома.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/mock_data.dart';
 import '../utils/formatters.dart';
 import '../widgets/info_row.dart';
@@ -11,6 +8,33 @@ import '../widgets/product_card.dart';
 
 class ShoppingListScreen extends StatelessWidget {
   const ShoppingListScreen({super.key});
+
+  // Деструктивное действие → диалог с результатом (C6).
+  // Реальная очистка списка появится на L4, вместе с состоянием.
+  Future<void> _confirmClear(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Очистить список покупок?'),
+        content: const Text('Все товары будут удалены из списка.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Очистить'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Список покупок очищен')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +46,22 @@ class ShoppingListScreen extends StatelessWidget {
         items.fold<double>(0, (sum, p) => sum + p.bestOffer.price);
     final maxTotal = items.fold<double>(0, (sum, p) => sum + p.maxPrice);
 
-    // Группировка: магазин -> товары, которые в нём дешевле всего.
     final byStore = <int, List<Product>>{};
     for (final p in items) {
       byStore.putIfAbsent(p.bestOffer.storeId, () => []).add(p);
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Список покупок')),
+      appBar: AppBar(
+        title: const Text('Список покупок'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Очистить список',
+            onPressed: () => _confirmClear(context),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -103,7 +135,10 @@ class ShoppingListScreen extends StatelessWidget {
           for (final p in items)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: ProductCard(product: p),
+              child: ProductCard(
+                product: p,
+                onTap: () => context.push('/shopping/${p.id}'),
+              ),
             ),
         ],
       ),

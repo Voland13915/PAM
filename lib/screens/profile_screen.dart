@@ -1,13 +1,37 @@
-// screens/profile_screen.dart
-// Профиль: данные пользователя, статистика, настройки (переключатели
-// пока не меняют состояние — это L4).
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/mock_data.dart';
 import '../utils/formatters.dart';
 import '../widgets/info_row.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  // Блокирующее решение → AlertDialog с результатом (C6).
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Выйти из аккаунта?'),
+        actions: [
+          TextButton(
+            // dialogCtx, а не context: под вложенными навигаторами вкладок
+            // pop по context-у экрана закрыл бы не диалог
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Нет'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Да, выйти'),
+          ),
+        ],
+      ),
+    );
+    // ok == true, а не ok!: диалог, закрытый мимо, возвращает null
+    if (ok == true && context.mounted) {
+      context.go('/login'); // go: раздел с вкладками уходит из стека
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +98,9 @@ class ProfileScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.storefront_outlined),
                   title: const Text('Отслеживаемые магазины'),
-                  trailing: Text('${mockStores.length}'),
+                  subtitle: Text('${mockStores.length} магазинов'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/profile/stores'),
                 ),
               ],
             ),
@@ -86,7 +112,7 @@ class ProfileScreen extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 children: [
-                  InfoRow(label: 'Версия', value: '0.2.0 (L2)'),
+                  InfoRow(label: 'Версия', value: '0.3.0 (L3)'),
                   InfoRow(label: 'Валюта', value: 'MDL'),
                 ],
               ),
@@ -95,7 +121,7 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            onPressed: () {},
+            onPressed: () => _logout(context),
             icon: const Icon(Icons.logout),
             label: const Text('Выйти из аккаунта'),
           ),
