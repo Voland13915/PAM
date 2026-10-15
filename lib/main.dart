@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'router.dart';
 
 void main() => runApp(const MyApp());
 
@@ -8,7 +8,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'TechPrice',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
           titleLarge: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-      home: const HomeScreen(),
+      routerConfig: router,
     );
   }
 }

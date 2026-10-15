@@ -1,8 +1,5 @@
-// screens/product_details_screen.dart
-// Детали товара: лучшая цена, цены во всех магазинах, история цены,
-// характеристики. Экран получает только id и сам ищет товар —
-// на L3 этот id придёт из адреса /products/:id.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../data/mock_data.dart';
 import '../utils/formatters.dart';
 import '../widgets/info_row.dart';
@@ -12,8 +9,18 @@ import '../widgets/product_image.dart';
 
 class ProductDetailsScreen extends StatelessWidget {
   final int productId;
+  final String basePath;
 
-  const ProductDetailsScreen({super.key, required this.productId});
+  const ProductDetailsScreen({
+    super.key,
+    required this.productId,
+    required this.basePath,
+  });
+
+  void _snack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +39,7 @@ class ProductDetailsScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.favorite_border),
             tooltip: 'В избранное',
-            onPressed: () {},
+            onPressed: () => _snack(context, 'Добавлено в избранное'),
           ),
         ],
       ),
@@ -134,7 +141,8 @@ class ProductDetailsScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () =>
+                      context.push('$basePath/$productId/track'),
                   icon: const Icon(Icons.notifications_outlined),
                   label: const Text('Следить'),
                 ),
@@ -142,7 +150,8 @@ class ProductDetailsScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () =>
+                      _snack(context, 'Добавлено в список покупок'),
                   icon: const Icon(Icons.add_shopping_cart),
                   label: const Text('В список'),
                 ),
