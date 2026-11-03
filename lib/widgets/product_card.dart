@@ -1,7 +1,10 @@
 // widgets/product_card.dart
 // Карточка товара: каталог, избранное, список покупок.
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import 'package:provider/provider.dart';
+
+import '../data/product.dart';
+import '../models/catalog_model.dart';
 import '../utils/formatters.dart';
 import 'product_image.dart';
 
@@ -22,7 +25,9 @@ class ProductCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final best = product.bestOffer;
-    final bestStore = storeById(best.storeId);
+    // Название магазина — из модели каталога (watch в build), а не из mock-а.
+    final bestStoreName =
+        context.watch<CatalogModel>().storeName(best.storeId);
     final count = product.offers.length;
 
     return Card(
@@ -68,7 +73,7 @@ class ProductCard extends StatelessWidget {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                'в ${bestStore.name}',
+                                'в $bestStoreName',
                                 overflow: TextOverflow.ellipsis,
                                 style: text.bodySmall,
                               ),
