@@ -1,71 +1,16 @@
-import 'dart:math';
+// data/mock_data.dart — ПРОМЕЖУТОЧНАЯ версия для шагов 2–10 (см. README_L4).
+// Финальная версия — только seed-списки. Единственные клиенты этого
+// файла — mock-хранилища (mock_*_repository.dart). Ни один экран, widget
+// или модель его не импортирует: на L5 файл удаляется вместе с mock-ами.
+import 'product.dart';
+import 'store.dart';
+import 'wishlist_item.dart';
 
-class Store {
-  final int id;
-  final String name;
-  final String website;
-  final int productsTracked;
-  final String lastSync;
-
-  const Store(this.id, this.name, this.website, this.productsTracked,
-      this.lastSync);
-}
-
-class Offer {
-  final int storeId;
-  final double price;
-  final double? oldPrice;
-  final bool inStock;
-
-  const Offer(this.storeId, this.price, {this.oldPrice, this.inStock = true});
-}
-
-class Product {
-  final int id;
-  final String name;
-  final String brand;
-  final String category;
-  final Map<String, String> specs;
-  final List<Offer> offers;
-  final List<double> priceHistory;
-
-  const Product({
-    required this.id,
-    required this.name,
-    required this.brand,
-    required this.category,
-    required this.specs,
-    required this.offers,
-    required this.priceHistory,
-  });
-
-  List<Offer> get inStockOffers => offers.where((o) => o.inStock).toList();
-
-  Offer get bestOffer =>
-      inStockOffers.reduce((a, b) => a.price <= b.price ? a : b);
-
-  double get maxPrice => inStockOffers.map((o) => o.price).reduce(max);
-
-  double get priceSpread => maxPrice - bestOffer.price;
-}
-
-class WishlistItem {
-  final int productId;
-  final double targetPrice;
-
-  const WishlistItem(this.productId, this.targetPrice);
-}
-
-class UserProfile {
-  final String name;
-  final String email;
-  final String city;
-  final double savedTotal;
-
-  const UserProfile(this.name, this.email, this.city, this.savedTotal);
-}
-
-// ---------------------------------------------------------------------------
+// ===== ВРЕМЕННО (шаги 2–10): ещё не мигрированные экраны L3 берут
+// классы отсюда. На шаге 11 файл заменяется финальной версией. =====
+export 'product.dart';
+export 'store.dart';
+export 'wishlist_item.dart';
 
 const mockStores = [
   Store(1, 'Bomba', 'bomba.md', 1240, '12 мин назад'),
@@ -74,17 +19,6 @@ const mockStores = [
   Store(4, 'Enter', 'enter.online', 930, '25 мин назад'),
   Store(5, 'Smart', 'smart.md', 715, '40 мин назад'),
   Store(6, 'Ultra', 'ultra.md', 1020, '1 ч назад'),
-];
-
-const mockCategories = [
-  'Смартфоны',
-  'Ноутбуки',
-  'Телевизоры',
-  'Наушники',
-  'Стиральные машины',
-  'Холодильники',
-  'Пылесосы',
-  'Микроволновки',
 ];
 
 const mockProducts = [
@@ -282,16 +216,38 @@ const mockProducts = [
 ];
 
 const mockWishlist = [
-  WishlistItem(1, 6800),
-  WishlistItem(2, 16000),
-  WishlistItem(4, 11500),
-  WishlistItem(6, 5000),
-  WishlistItem(7, 8500),
-  WishlistItem(8, 12500),
-  WishlistItem(9, 3900),
+  // WishlistItem(id, productId, storeId, желаемая цена)
+  WishlistItem(1, 1, 2, 6800),
+  WishlistItem(2, 2, 4, 16000),
+  WishlistItem(3, 4, 4, 11500),
+  WishlistItem(4, 6, 4, 5000),
+  WishlistItem(5, 7, 2, 8500),
+  WishlistItem(6, 8, 6, 12500),
+  WishlistItem(7, 9, 5, 3900),
+];
+
+// ===== ВРЕМЕННО (удаляется на шаге 11) =====
+const mockCategories = [
+  'Смартфоны',
+  'Ноутбуки',
+  'Телевизоры',
+  'Наушники',
+  'Стиральные машины',
+  'Холодильники',
+  'Пылесосы',
+  'Микроволновки',
 ];
 
 const mockShoppingListIds = [1, 5, 6, 7, 9, 10];
+
+class UserProfile {
+  final String name;
+  final String email;
+  final String city;
+  final double savedTotal;
+
+  const UserProfile(this.name, this.email, this.city, this.savedTotal);
+}
 
 const mockUser = UserProfile(
   'Ион Попеску',
@@ -302,3 +258,4 @@ const mockUser = UserProfile(
 
 Product productById(int id) => mockProducts.firstWhere((p) => p.id == id);
 Store storeById(int id) => mockStores.firstWhere((s) => s.id == id);
+// ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
