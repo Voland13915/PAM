@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../data/mock_data.dart';
+import 'package:provider/provider.dart';
+
+import '../data/mock_network.dart';
+import '../data/product.dart';
+import '../models/catalog_model.dart';
+import '../models/session_model.dart';
+import '../models/shopping_list_model.dart';
+import '../models/wishlist_model.dart';
 import '../utils/formatters.dart';
 import '../widgets/info_row.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // Блокирующее решение → AlertDialog с результатом (C6).
   Future<void> _logout(BuildContext context) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -15,8 +21,6 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('Выйти из аккаунта?'),
         actions: [
           TextButton(
-            // dialogCtx, а не context: под вложенными навигаторами вкладок
-            // pop по context-у экрана закрыл бы не диалог
             onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Нет'),
           ),
@@ -27,9 +31,9 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
-    // ok == true, а не ok!: диалог, закрытый мимо, возвращает null
     if (ok == true && context.mounted) {
-      context.go('/login'); // go: раздел с вкладками уходит из стека
+      context.read<SessionModel>().signOut();
+      context.go('/login');
     }
   }
 
@@ -37,7 +41,19 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final initials = mockUser.name.split(' ').map((w) => w[0]).join();
+
+    final session = context.watch<SessionModel>();
+    final wishlist = context.watch<WishlistModel>();
+    final shopping = context.watch<ShoppingListModel>();
+    final catalog = context.watch<CatalogModel>();
+
+    final name = session.displayName;
+    final initials = name.isEmpty ? '?' : name[0].toUpperCase();
+
+    final savings = shopping.productIds
+        .map(catalog.byId)
+        .whereType<Product>()
+        .fold<double>(0, (sum, p) => sum + p.priceSpread);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Профиль')),
@@ -53,24 +69,24 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text(mockUser.name,
-              textAlign: TextAlign.center, style: text.titleLarge),
-          Text(
-            mockUser.email,
-            textAlign: TextAlign.center,
-            style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-          ),
+          Text(name, textAlign: TextAlign.center, style: text.titleLarge),
+          if (session.email != null)
+            Text(
+              session.email!,
+              textAlign: TextAlign.center,
+              style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           const SizedBox(height: 16),
           Row(
             children: [
-              _StatTile(value: '${mockWishlist.length}', label: 'в избранном'),
-              const SizedBox(width: 8),
               _StatTile(
-                  value: '${mockShoppingListIds.length}', label: 'в списке'),
+                value: wishlist.isLoading ? '…' : '${wishlist.items.length}',
+                label: 'в избранном',
+              ),
               const SizedBox(width: 8),
-              _StatTile(
-                  value: formatPrice(mockUser.savedTotal),
-                  label: 'сэкономлено'),
+              _StatTile(value: '${shopping.count}', label: 'в списке'),
+              const SizedBox(width: 8),
+              _StatTile(value: formatPrice(savings), label: 'экономия'),
             ],
           ),
 
@@ -84,21 +100,12 @@ class ProfileScreen extends StatelessWidget {
                   value: true,
                   onChanged: (_) {},
                 ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.dark_mode_outlined),
-                  title: const Text('Тёмная тема'),
-                  value: false,
-                  onChanged: (_) {},
-                ),
-                ListTile(
-                  leading: const Icon(Icons.location_city_outlined),
-                  title: const Text('Город'),
-                  trailing: Text(mockUser.city),
-                ),
                 ListTile(
                   leading: const Icon(Icons.storefront_outlined),
                   title: const Text('Отслеживаемые магазины'),
-                  subtitle: Text('${mockStores.length} магазинов'),
+                  subtitle: Text(catalog.isLoading
+                      ? 'загружается…'
+                      : '${catalog.stores.length} магазинов'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/profile/stores'),
                 ),
@@ -106,13 +113,16 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
 
+          const SectionTitle('Демонстрация (L4)'),
+          const Card(child: _NetworkFailureSwitch()),
+
           const SectionTitle('О приложении'),
           const Card(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 children: [
-                  InfoRow(label: 'Версия', value: '0.3.0 (L3)'),
+                  InfoRow(label: 'Версия', value: '0.4.0 (L4)'),
                   InfoRow(label: 'Валюта', value: 'MDL'),
                 ],
               ),
@@ -127,6 +137,37 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NetworkFailureSwitch extends StatefulWidget {
+  const _NetworkFailureSwitch();
+
+  @override
+  State<_NetworkFailureSwitch> createState() => _NetworkFailureSwitchState();
+}
+
+class _NetworkFailureSwitchState extends State<_NetworkFailureSwitch> {
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _enabled = context.read<MockNetwork>().simulateError;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.cloud_off_outlined),
+      title: const Text('Симулировать сбой сети'),
+      subtitle: const Text('Любой запрос к хранилищу вернёт ошибку'),
+      value: _enabled,
+      onChanged: (value) {
+        setState(() => _enabled = value);
+        context.read<MockNetwork>().simulateError = value;
+      },
     );
   }
 }

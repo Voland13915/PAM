@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../data/mock_data.dart';
+import 'package:provider/provider.dart';
+
+import '../data/wishlist_item.dart';
+import '../models/catalog_model.dart';
+import '../models/wishlist_model.dart';
 import '../utils/formatters.dart';
 import '../utils/validators.dart';
+import '../widgets/missing_product_view.dart';
 
 class TrackPriceScreen extends StatefulWidget {
   final int productId;
@@ -19,6 +24,19 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
   final _priceCtrl = TextEditingController();
   int? _storeId;
   bool _notify = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing =
+        context.read<WishlistModel>().byProduct(widget.productId);
+    if (existing != null) {
+      _priceCtrl.text = existing.targetPrice.round().toString();
+      _storeId = existing.storeId;
+      _notify = existing.notify;
+    }
+  }
 
   @override
   void dispose() {
@@ -26,16 +44,42 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save(String storeName) async {
     if (!_formKey.currentState!.validate()) return;
+
+    final wishlist = context.read<WishlistModel>();
+    final existing = wishlist.byProduct(widget.productId);
     final price = double.parse(_priceCtrl.text);
-    final store = storeById(_storeId!).name;
+
+    setState(() => _saving = true);
+    final error = existing == null
+        ? await wishlist.add(WishlistItem(
+            0,
+            widget.productId,
+            _storeId!,
+            price,
+            notify: _notify,
+          ))
+        : await wishlist.update(existing.copyWith(
+            storeId: _storeId,
+            targetPrice: price,
+            notify: _notify,
+          ));
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Слежение включено: до ${formatPrice(price)} в $store'),
+        content: Text('Слежение включено: до ${formatPrice(price)} '
+            'в $storeName'),
       ),
     );
-    context.pop(); // открыто push-ем → закрывается pop-ом
+    context.pop();
   }
 
   @override
@@ -43,9 +87,13 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    // Экран сам ищет товар по id из адреса.
-    final product = productById(widget.productId);
+    final catalog = context.watch<CatalogModel>();
+    final product = catalog.byId(widget.productId);
+    if (product == null) {
+      return const MissingProductView(title: 'Следить за ценой');
+    }
     final best = product.bestOffer.price;
+    final storeName = _storeId == null ? '' : catalog.storeName(_storeId!);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Следить за ценой')),
@@ -76,6 +124,7 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
+              value: _storeId,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Магазин',
@@ -87,7 +136,7 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
                   DropdownMenuItem(
                     value: offer.storeId,
                     child: Text(
-                      '${storeById(offer.storeId).name} — '
+                      '${catalog.storeName(offer.storeId)} — '
                       '${formatPrice(offer.price)}',
                     ),
                   ),
@@ -104,8 +153,14 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: _save,
-              child: const Text('Сохранить'),
+              onPressed: _saving ? null : () => _save(storeName),
+              child: _saving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Сохранить'),
             ),
           ],
         ),

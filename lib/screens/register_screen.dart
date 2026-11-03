@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../models/session_model.dart';
 import '../utils/validators.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -27,10 +30,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    context
+        .read<SessionModel>()
+        .register(_nameCtrl.text.trim(), _emailCtrl.text.trim());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Аккаунт создан: ${_nameCtrl.text.trim()}')),
     );
-    context.go('/catalog'); // go: вход и регистрация уходят из стека
+    context.go('/catalog');
   }
 
   @override

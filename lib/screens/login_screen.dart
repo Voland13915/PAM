@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../models/session_model.dart';
 import '../utils/validators.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    context.read<SessionModel>().signIn(_emailCtrl.text.trim());
     context.go('/catalog');
   }
 
@@ -88,7 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               TextButton(
-                // push: «зайду и вернусь» — с регистрации можно назад на вход
                 onPressed: () => context.push('/register'),
                 child: const Text('Нет аккаунта? Зарегистрируйтесь'),
               ),
