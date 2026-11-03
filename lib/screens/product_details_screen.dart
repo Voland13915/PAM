@@ -1,15 +1,25 @@
+// screens/product_details_screen.dart
+// Детали товара: лучшая цена, цены во всех магазинах, история цены,
+// характеристики. Экран получает id из адреса (/catalog/:id и т.п.)
+// и ищет товар через CatalogModel — адрес остался с L3, источник
+// поменялся под низом. basePath — вкладка, из которой открыты детали.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../data/mock_data.dart';
+import 'package:provider/provider.dart';
+
+import '../models/catalog_model.dart';
+import '../models/shopping_list_model.dart';
+import '../models/wishlist_model.dart';
 import '../utils/formatters.dart';
 import '../widgets/info_row.dart';
+import '../widgets/missing_product_view.dart';
 import '../widgets/price_history_chart.dart';
 import '../widgets/price_row.dart';
 import '../widgets/product_image.dart';
 
 class ProductDetailsScreen extends StatelessWidget {
   final int productId;
-  final String basePath;
+  final String basePath; // '/catalog', '/wishlist' или '/shopping'
 
   const ProductDetailsScreen({
     super.key,
@@ -27,7 +37,19 @@ class ProductDetailsScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    final product = productById(productId);
+    // watch в build: экран перестроится при любой из трёх вестей.
+    // Все подписки — до любого раннего return.
+    final catalog = context.watch<CatalogModel>();
+    final inList = context.watch<ShoppingListModel>().contains(productId);
+    final tracked =
+        context.watch<WishlistModel>().byProduct(productId) != null;
+
+    final product = catalog.byId(productId);
+    if (product == null) {
+      // грузится → spinner; упало → retry; загружено, id нет → сообщение
+      return const MissingProductView();
+    }
+
     final best = product.bestOffer;
     final offers = [...product.offers]
       ..sort((a, b) => a.price.compareTo(b.price));
@@ -37,9 +59,11 @@ class ProductDetailsScreen extends StatelessWidget {
         title: Text(product.brand),
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite_border),
-            tooltip: 'В избранное',
-            onPressed: () => _snack(context, 'Добавлено в избранное'),
+            // Сердечко отражает разделяемое состояние «Избранного»:
+            // форма слежения его меняет — и детали узнают сами.
+            icon: Icon(tracked ? Icons.favorite : Icons.favorite_border),
+            tooltip: tracked ? 'Изменить слежение' : 'Следить за ценой',
+            onPressed: () => context.push('$basePath/$productId/track'),
           ),
         ],
       ),
@@ -73,7 +97,7 @@ class ProductDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Дешевле всего в ${storeById(best.storeId).name}',
+                          'Дешевле всего в ${catalog.storeName(best.storeId)}',
                           style: text.bodyMedium
                               ?.copyWith(color: scheme.onPrimaryContainer),
                         ),
@@ -105,7 +129,7 @@ class ProductDetailsScreen extends StatelessWidget {
               children: [
                 for (final offer in offers)
                   PriceRow(
-                    label: storeById(offer.storeId).name,
+                    label: catalog.storeName(offer.storeId),
                     price: offer.price,
                     oldPrice: offer.oldPrice,
                     isBest: offer == best,
@@ -141,20 +165,35 @@ class ProductDetailsScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
+                  // push: открыть форму и вернуться к деталям
                   onPressed: () =>
                       context.push('$basePath/$productId/track'),
-                  icon: const Icon(Icons.notifications_outlined),
-                  label: const Text('Следить'),
+                  icon: Icon(tracked
+                      ? Icons.notifications_active
+                      : Icons.notifications_outlined),
+                  label: Text(tracked ? 'Изменить' : 'Следить'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: FilledButton.icon(
-                  onPressed: () =>
-                      _snack(context, 'Добавлено в список покупок'),
-                  icon: const Icon(Icons.add_shopping_cart),
-                  label: const Text('В список'),
-                ),
+                child: inList
+                    ? FilledButton.tonalIcon(
+                        // read в callback-е: действие, а не подписка
+                        onPressed: () {
+                          context.read<ShoppingListModel>().remove(productId);
+                          _snack(context, 'Убрано из списка покупок');
+                        },
+                        icon: const Icon(Icons.remove_shopping_cart),
+                        label: const Text('Убрать'),
+                      )
+                    : FilledButton.icon(
+                        onPressed: () {
+                          context.read<ShoppingListModel>().add(productId);
+                          _snack(context, 'Добавлено в список покупок');
+                        },
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('В список'),
+                      ),
               ),
             ],
           ),
