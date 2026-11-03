@@ -1,7 +1,7 @@
 // widgets/store_card.dart
 // Карточка магазина: экран «Магазины» (повторяется в списке).
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+import '../data/store.dart';
 import '../utils/formatters.dart';
 
 class StoreCard extends StatelessWidget {
