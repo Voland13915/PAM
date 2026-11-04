@@ -1,16 +1,9 @@
-// data/mock_data.dart — ПРОМЕЖУТОЧНАЯ версия для шагов 2–10 (см. README_L4).
-// Финальная версия — только seed-списки. Единственные клиенты этого
+// data/mock_data.dart — только seed-списки. Единственные клиенты этого
 // файла — mock-хранилища (mock_*_repository.dart). Ни один экран, widget
 // или модель его не импортирует: на L5 файл удаляется вместе с mock-ами.
 import 'product.dart';
 import 'store.dart';
 import 'wishlist_item.dart';
-
-// ===== ВРЕМЕННО (шаги 2–10): ещё не мигрированные экраны L3 берут
-// классы отсюда. На шаге 11 файл заменяется финальной версией. =====
-export 'product.dart';
-export 'store.dart';
-export 'wishlist_item.dart';
 
 const mockStores = [
   Store(1, 'Bomba', 'bomba.md', 1240, '12 мин назад'),
@@ -225,37 +218,3 @@ const mockWishlist = [
   WishlistItem(6, 8, 6, 12500),
   WishlistItem(7, 9, 5, 3900),
 ];
-
-// ===== ВРЕМЕННО (удаляется на шаге 11) =====
-const mockCategories = [
-  'Смартфоны',
-  'Ноутбуки',
-  'Телевизоры',
-  'Наушники',
-  'Стиральные машины',
-  'Холодильники',
-  'Пылесосы',
-  'Микроволновки',
-];
-
-const mockShoppingListIds = [1, 5, 6, 7, 9, 10];
-
-class UserProfile {
-  final String name;
-  final String email;
-  final String city;
-  final double savedTotal;
-
-  const UserProfile(this.name, this.email, this.city, this.savedTotal);
-}
-
-const mockUser = UserProfile(
-  'Ион Попеску',
-  'ion.popescu@mail.md',
-  'Кишинёв',
-  2340,
-);
-
-Product productById(int id) => mockProducts.firstWhere((p) => p.id == id);
-Store storeById(int id) => mockStores.firstWhere((s) => s.id == id);
-// ===== КОНЕЦ ВРЕМЕННОГО БЛОКА =====
