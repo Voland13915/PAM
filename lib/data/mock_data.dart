@@ -1,6 +1,3 @@
-// data/mock_data.dart — только seed-списки. Единственные клиенты этого
-// файла — mock-хранилища (mock_*_repository.dart). Ни один экран, widget
-// или модель его не импортирует: на L5 файл удаляется вместе с mock-ами.
 import 'product.dart';
 import 'store.dart';
 import 'wishlist_item.dart';

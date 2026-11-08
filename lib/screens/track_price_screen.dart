@@ -124,7 +124,7 @@ class _TrackPriceScreenState extends State<TrackPriceScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _storeId,
+              initialValue: _storeId,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Магазин',
