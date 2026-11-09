@@ -1,8 +1,3 @@
-# Standard responses and small JSON helpers used by every route.
-#
-# Every error in the API has the same shape:
-#   {"error": {"code": "SOME_CODE", "message": "human readable text"}}
-
 from typing import Any, Dict, Optional
 
 from fastapi import Request
@@ -10,12 +5,10 @@ from fastapi.responses import JSONResponse
 
 
 def json_response(data: Any, status: int = 200) -> JSONResponse:
-    """Sends `data` as a JSON response."""
     return JSONResponse(data, status_code=status)
 
 
 class ApiError(Exception):
-    """Raised by handlers; app/main.py turns it into the standard error body."""
 
     def __init__(self, status: int, code: str, message: str):
         super().__init__(message)
@@ -49,7 +42,6 @@ def email_taken() -> ApiError:
 
 
 async def read_json_body(request: Request) -> Optional[Dict[str, Any]]:
-    """Reads the request body as a JSON object, or None when it is not one."""
     try:
         decoded = await request.json()
     except Exception:
@@ -58,7 +50,6 @@ async def read_json_body(request: Request) -> Optional[Dict[str, Any]]:
 
 
 def string_field(body: Dict[str, Any], key: str) -> Optional[str]:
-    """Returns body[key] as a trimmed non-empty string, or None when missing."""
     value = body.get(key)
     if not isinstance(value, str):
         return None

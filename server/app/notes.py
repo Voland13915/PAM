@@ -1,10 +1,3 @@
-# Notes: the example CRUD entity, scoped per user.
-#
-# THIS FILE IS THE TEMPLATE FOR YOUR OWN ENTITIES.
-# To add e.g. "recipes": copy this file to recipes.py, rename the table
-# and the fields, add a CREATE TABLE in db.py, include the new router in
-# main.py. That's the whole recipe.
-
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response

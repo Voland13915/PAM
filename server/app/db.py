@@ -1,14 +1,7 @@
-# SQLite setup. The database file is created automatically on first start.
-#
-# To add your own entity: add a CREATE TABLE below, then copy the pattern
-# of app/notes.py for its routes.
-
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-# The project folder (the one holding requirements.txt), regardless of the
-# current working directory — so app.db always lands in the same place.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 _SCHEMA = """
@@ -28,6 +21,36 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS stores (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  name             TEXT    NOT NULL,
+  website          TEXT    NOT NULL,
+  products_tracked INTEGER NOT NULL DEFAULT 0,
+  last_sync        TEXT    NOT NULL DEFAULT '',
+  created_at       TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  name          TEXT    NOT NULL,
+  brand         TEXT    NOT NULL DEFAULT '',
+  category      TEXT    NOT NULL,
+  specs         TEXT    NOT NULL DEFAULT '{}',  -- JSON-объект «характеристика: значение»
+  offers        TEXT    NOT NULL DEFAULT '[]',  -- JSON-массив цен по магазинам
+  price_history TEXT    NOT NULL DEFAULT '[]',  -- JSON-массив минимальных цен
+  created_at    TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wishlist (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL REFERENCES users (id),
+  product_id   INTEGER NOT NULL REFERENCES products (id),
+  store_id     INTEGER NOT NULL REFERENCES stores (id),
+  target_price REAL    NOT NULL,
+  notify       INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT    NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS files (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id    INTEGER NOT NULL REFERENCES users (id),
@@ -39,20 +62,19 @@ CREATE TABLE IF NOT EXISTS files (
 );
 """
 
-# The single database connection, opened (and the schema applied) at import
-# time. All route handlers are `async def`, so they all run on the event
-# loop's single thread — one shared connection is safe here.
-# isolation_level=None = autocommit: every INSERT/UPDATE/DELETE is written
-# to disk immediately, which is what gives persistence across restarts.
 conn = sqlite3.connect(
     BASE_DIR / "app.db", check_same_thread=False, isolation_level=None
 )
 conn.row_factory = sqlite3.Row  # rows behave like dicts: row["title"]
 conn.executescript(_SCHEMA)
 
+conn.create_function(
+    "ULOWER", 1, lambda s: s.lower() if isinstance(s, str) else s,
+    deterministic=True,
+)
+
 
 def now_iso():
-    """Current UTC time in ISO-8601, the format used for all timestamps."""
     return (
         datetime.now(timezone.utc)
         .isoformat(timespec="milliseconds")

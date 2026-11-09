@@ -1,9 +1,3 @@
-# PAM backend template - Python/FastAPI port.
-#
-# Start:  pip install -r requirements.txt   (once)
-#         python3 -m app.main
-# Env:    PORT (default 8080), JWT_SECRET (default dev-secret-change-me)
-
 import os
 
 from fastapi import FastAPI, Request
@@ -11,8 +5,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, files, notes  # importing app.db inside them creates app.db
+from . import auth, files, notes
+from . import products, stores
 from .errors import ApiError, json_response
+from .seed import seed_if_empty
+
+seed_if_empty()
 
 app = FastAPI(title="PAM Backend Template", docs_url=None, redoc_url=None)
 
@@ -26,6 +24,9 @@ async def health():
 app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(files.router)
+# TechPrice theme entities, under the same auth dependency as /notes.
+app.include_router(stores.router)
+app.include_router(products.router)
 
 # Permissive CORS so a Flutter *web* build can call the API during the labs.
 app.add_middleware(
