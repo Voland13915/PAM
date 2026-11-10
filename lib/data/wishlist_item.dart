@@ -1,12 +1,9 @@
-// data/wishlist_item.dart — доменная модель слежения за ценой
-// (вторая пишущая сущность темы: её создаёт форма «Следить за ценой»).
-
 class WishlistItem {
-  final int id; // идентичность записи; даёт хранилище (на L5 — сервер)
+  final int id;
   final int productId;
   final int storeId;
-  final double targetPrice; // желаемая цена
-  final bool notify; // уведомить о снижении
+  final double targetPrice;
+  final bool notify;
 
   const WishlistItem(
     this.id,

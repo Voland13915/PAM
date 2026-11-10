@@ -19,7 +19,7 @@ GoRoute _productRoute(String base) => GoRoute(
       },
       routes: [
         GoRoute(
-          path: 'track', // полный адрес: <base>/:id/track
+          path: 'track',
           builder: (context, state) {
             final id = int.parse(state.pathParameters['id']!);
             return TrackPriceScreen(productId: id);
@@ -71,7 +71,7 @@ final router = GoRouter(
             builder: (context, state) => const ProfileScreen(),
             routes: [
               GoRoute(
-                path: 'stores', // полный адрес: /profile/stores
+                path: 'stores',
                 builder: (context, state) => const StoresScreen(),
               ),
             ],

@@ -1,5 +1,3 @@
-// widgets/product_card.dart
-// Карточка товара: каталог, избранное, список покупок.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,8 +8,8 @@ import 'product_image.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
-  final VoidCallback? onTap; // пустое место под навигацию L3
-  final Widget? footer; // дополнительная строка снизу (например, желаемая цена)
+  final VoidCallback? onTap;
+  final Widget? footer;
 
   const ProductCard({
     super.key,
@@ -25,7 +23,6 @@ class ProductCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final best = product.bestOffer;
-    // Название магазина — из модели каталога (watch в build), а не из mock-а.
     final bestStoreName =
         context.watch<CatalogModel>().storeName(best.storeId);
     final count = product.offers.length;

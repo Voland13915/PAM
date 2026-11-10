@@ -206,7 +206,6 @@ const mockProducts = [
 ];
 
 const mockWishlist = [
-  // WishlistItem(id, productId, storeId, желаемая цена)
   WishlistItem(1, 1, 2, 6800),
   WishlistItem(2, 2, 4, 16000),
   WishlistItem(3, 4, 4, 11500),

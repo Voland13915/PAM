@@ -34,7 +34,7 @@ class WishlistScreen extends StatelessWidget {
     if (ok != true || !context.mounted) return false;
 
     final error = await context.read<WishlistModel>().remove(item.id);
-    if (!context.mounted) return error == null; // экран мог исчезнуть
+    if (!context.mounted) return error == null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(error ?? 'Слежение отключено: $productName')),
     );
@@ -55,7 +55,6 @@ class WishlistScreen extends StatelessWidget {
       body = ErrorView(
         message: (wishlist.error ?? catalog.error)!,
         onRetry: () {
-          // read в callback-е; перезагружаем только то, что упало
           if (wishlist.error != null) context.read<WishlistModel>().load();
           if (catalog.error != null) context.read<CatalogModel>().load();
         },
@@ -92,7 +91,7 @@ class WishlistScreen extends StatelessWidget {
                 final product = catalog.byId(item.productId);
                 if (product == null) return const SizedBox.shrink();
                 return Dismissible(
-                  key: ValueKey(item.id), // идентичность из данных
+                  key: ValueKey(item.id),
                   direction: DismissDirection.endToStart,
                   confirmDismiss: (_) =>
                       _confirmRemove(context, item, product.name),

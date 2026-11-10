@@ -1,4 +1,3 @@
-// data/mock_store_repository.dart — справочник магазинов в памяти.
 import 'mock_data.dart';
 import 'mock_network.dart';
 import 'result.dart';

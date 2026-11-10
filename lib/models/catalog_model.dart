@@ -1,6 +1,3 @@
-// models/catalog_model.dart — разделяемое состояние каталога: товары и
-// магазины + триада loading / data / error (C8). Чистый Dart: ни одного
-// widget-а (ChangeNotifier приходит из foundation, это не widget).
 import 'package:flutter/foundation.dart';
 
 import '../data/product.dart';
@@ -10,8 +7,6 @@ import '../data/store.dart';
 import '../data/store_repository.dart';
 
 class CatalogModel extends ChangeNotifier {
-  // Простой DI: хранилища входят через конструктор. Тип полей — ИНТЕРФЕЙС:
-  // модель не знает и не должна знать, mock это или http.
   CatalogModel(this._productRepository, this._storeRepository);
 
   final ProductRepository _productRepository;
@@ -25,16 +20,12 @@ class CatalogModel extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get error => _error;
 
-  // Наружу — только для чтения: мутация возможна лишь через методы модели,
-  // которые извещают подписчиков.
   List<Product> get products => List.unmodifiable(_products);
   List<Store> get stores => List.unmodifiable(_stores);
 
-  /// Категории выводятся из загруженных товаров, в порядке появления.
   List<String> get categories =>
       List.unmodifiable(_products.map((p) => p.category).toSet());
 
-  /// Ищет в загруженном списке; null — если такого id нет (или ещё грузится).
   Product? byId(int id) {
     for (final p in _products) {
       if (p.id == id) return p;
@@ -54,9 +45,8 @@ class CatalogModel extends ChangeNotifier {
   Future<void> load() async {
     _loading = true;
     _error = null;
-    notifyListeners(); // подписанные экраны входят в «грузится»
+    notifyListeners();
 
-    // Оба запроса стартуют сразу, ждём их вместе (а не 2 × задержка).
     final productsFuture = _productRepository.fetchAll();
     final storesFuture = _storeRepository.fetchAll();
 
@@ -74,6 +64,6 @@ class CatalogModel extends ChangeNotifier {
     }
 
     _loading = false;
-    notifyListeners(); // …и выходят: с данными или с ошибкой — никогда молча
+    notifyListeners();
   }
 }

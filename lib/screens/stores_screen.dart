@@ -1,5 +1,3 @@
-// screens/stores_screen.dart
-// Магазины: справочник из CatalogModel, с тремя состояниями.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

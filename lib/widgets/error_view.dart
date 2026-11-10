@@ -1,4 +1,3 @@
-// widgets/error_view.dart — ошибка никогда не молчит и всегда имеет retry.
 import 'package:flutter/material.dart';
 
 class ErrorView extends StatelessWidget {

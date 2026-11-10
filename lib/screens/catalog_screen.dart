@@ -1,6 +1,3 @@
-// screens/catalog_screen.dart
-// Каталог: три состояния — грузится / данные / ошибка с retry (C8).
-// Данные приходят из CatalogModel, а не из mock-а: экран не знает источника.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -15,20 +12,18 @@ class CatalogScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = context.watch<CatalogModel>(); // watch в build (C7)
+    final catalog = context.watch<CatalogModel>();
 
     final Widget body;
     if (catalog.isLoading) {
-      body = const Center(child: CircularProgressIndicator()); // 1) грузится
+      body = const Center(child: CircularProgressIndicator());
     } else if (catalog.error != null) {
       body = ErrorView(
-        // 2) упало
         message: catalog.error!,
-        onRetry: () => context.read<CatalogModel>().load(), // read: действие
+        onRetry: () => context.read<CatalogModel>().load(),
       );
     } else {
       body = _CatalogContent(
-        // 3) данные
         products: catalog.products,
         categories: catalog.categories,
       );
@@ -39,12 +34,11 @@ class CatalogScreen extends StatelessWidget {
         title: const Text('Каталог'),
         actions: [
           IconButton(
-            // Повторная загрузка: с включённой аварией показывает ошибку
             icon: const Icon(Icons.refresh),
             tooltip: 'Обновить',
             onPressed: catalog.isLoading
                 ? null
-                : () => context.read<CatalogModel>().load(), // read: действие
+                : () => context.read<CatalogModel>().load(),
           ),
         ],
       ),
@@ -53,8 +47,6 @@ class CatalogScreen extends StatelessWidget {
   }
 }
 
-/// Поиск, фильтры и список — тот же layout, что на L2–L3.
-/// Фильтры пока визуальные.
 class _CatalogContent extends StatelessWidget {
   final List<Product> products;
   final List<String> categories;
@@ -83,7 +75,6 @@ class _CatalogContent extends StatelessWidget {
             ),
           ),
         ),
-        // Фильтр по категории: категории выводит модель из загруженных товаров
         SizedBox(
           height: 48,
           child: ListView.separated(
@@ -138,7 +129,7 @@ class _CatalogContent extends StatelessWidget {
             itemBuilder: (context, index) {
               final product = products[index];
               return ProductCard(
-                key: ValueKey(product.id), // идентичность из данных (C7)
+                key: ValueKey(product.id),
                 product: product,
                 onTap: () => context.push('/catalog/${product.id}'),
               );

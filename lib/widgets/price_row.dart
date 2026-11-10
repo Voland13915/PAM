@@ -1,6 +1,3 @@
-// widgets/price_row.dart
-// Строка «название — цена»: цены по магазинам (детали) и товары в группе
-// магазина (список покупок).
 import 'package:flutter/material.dart';
 import '../utils/formatters.dart';
 
@@ -10,7 +7,7 @@ class PriceRow extends StatelessWidget {
   final double? oldPrice;
   final bool isBest;
   final bool inStock;
-  final String? subtitle; // если null — статус наличия
+  final String? subtitle;
 
   const PriceRow({
     super.key,

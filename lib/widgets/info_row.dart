@@ -1,5 +1,3 @@
-// widgets/info_row.dart
-// Строка «метка: значение» — характеристики товара, итоги списка покупок.
 import 'package:flutter/material.dart';
 
 class InfoRow extends StatelessWidget {
@@ -48,7 +46,6 @@ class InfoRow extends StatelessWidget {
   }
 }
 
-/// Заголовок секции внутри длинного экрана.
 class SectionTitle extends StatelessWidget {
   final String title;
 

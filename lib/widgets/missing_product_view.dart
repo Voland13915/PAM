@@ -1,7 +1,3 @@
-// widgets/missing_product_view.dart — экран, у которого нет товара по id.
-// У null два смысла (C8): список ещё грузится → spinner; загружен, но
-// такого id нет → короткое сообщение, а не вечный spinner. Плюс третий:
-// загрузка упала → ErrorView с retry.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

@@ -33,7 +33,7 @@ class ShoppingListScreen extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    context.read<ShoppingListModel>().clear(); // read: действие
+    context.read<ShoppingListModel>().clear();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Список покупок очищен')),
     );
@@ -195,7 +195,6 @@ class _ListContent extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Dismissible(
-              // Идентичность из данных, а не UniqueKey (C7)
               key: ValueKey(p.id),
               direction: DismissDirection.endToStart,
               background: Container(

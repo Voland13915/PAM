@@ -1,6 +1,3 @@
-// models/shopping_list_model.dart — список покупок (аналог корзины с C7):
-// разделяемое состояние в памяти, без хранилища. Пишут детали товара,
-// читают вкладка «Покупки», badge на панели и профиль.
 import 'package:flutter/foundation.dart';
 
 class ShoppingListModel extends ChangeNotifier {
@@ -11,9 +8,9 @@ class ShoppingListModel extends ChangeNotifier {
   bool contains(int productId) => _productIds.contains(productId);
 
   void add(int productId) {
-    if (_productIds.contains(productId)) return; // уже есть — мутации нет
+    if (_productIds.contains(productId)) return;
     _productIds.add(productId);
-    notifyListeners(); // весть уходит ко ВСЕМ подписчикам
+    notifyListeners();
   }
 
   void remove(int productId) {

@@ -1,5 +1,3 @@
-// widgets/app_shell.dart — обёртка с постоянными вкладками.
-// StatelessWidget: текущий индекс вкладки знает router.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +9,6 @@ class AppShell extends StatelessWidget {
 
   const AppShell({super.key, required this.navigationShell});
 
-  /// Иконка «Покупки» с badge: один живой угол — Consumer (C7).
-  /// Перестраивается только badge, а не вся панель.
   Widget _cartIcon(IconData icon) => Consumer<ShoppingListModel>(
         builder: (context, list, child) => Badge(
           isLabelVisible: list.count > 0,
@@ -25,10 +21,10 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell, // содержимое текущей вкладки
+      body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: navigationShell.goBranch, // переключает вкладку
+        onDestinationSelected: navigationShell.goBranch,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),

@@ -1,8 +1,3 @@
-// screens/product_details_screen.dart
-// Детали товара: лучшая цена, цены во всех магазинах, история цены,
-// характеристики. Экран получает id из адреса (/catalog/:id и т.п.)
-// и ищет товар через CatalogModel — адрес остался с L3, источник
-// поменялся под низом. basePath — вкладка, из которой открыты детали.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -19,7 +14,7 @@ import '../widgets/product_image.dart';
 
 class ProductDetailsScreen extends StatelessWidget {
   final int productId;
-  final String basePath; // '/catalog', '/wishlist' или '/shopping'
+  final String basePath;
 
   const ProductDetailsScreen({
     super.key,
@@ -37,8 +32,6 @@ class ProductDetailsScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    // watch в build: экран перестроится при любой из трёх вестей.
-    // Все подписки — до любого раннего return.
     final catalog = context.watch<CatalogModel>();
     final inList = context.watch<ShoppingListModel>().contains(productId);
     final tracked =
@@ -46,7 +39,6 @@ class ProductDetailsScreen extends StatelessWidget {
 
     final product = catalog.byId(productId);
     if (product == null) {
-      // грузится → spinner; упало → retry; загружено, id нет → сообщение
       return const MissingProductView();
     }
 
@@ -59,8 +51,6 @@ class ProductDetailsScreen extends StatelessWidget {
         title: Text(product.brand),
         actions: [
           IconButton(
-            // Сердечко отражает разделяемое состояние «Избранного»:
-            // форма слежения его меняет — и детали узнают сами.
             icon: Icon(tracked ? Icons.favorite : Icons.favorite_border),
             tooltip: tracked ? 'Изменить слежение' : 'Следить за ценой',
             onPressed: () => context.push('$basePath/$productId/track'),
@@ -82,7 +72,6 @@ class ProductDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Лучшая цена
           Card(
             color: scheme.primaryContainer,
             child: Padding(
@@ -165,7 +154,6 @@ class ProductDetailsScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  // push: открыть форму и вернуться к деталям
                   onPressed: () =>
                       context.push('$basePath/$productId/track'),
                   icon: Icon(tracked

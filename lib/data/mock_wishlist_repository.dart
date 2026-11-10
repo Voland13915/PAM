@@ -1,4 +1,3 @@
-// data/mock_wishlist_repository.dart — слежения за ценой в памяти.
 import 'mock_data.dart';
 import 'mock_network.dart';
 import 'result.dart';

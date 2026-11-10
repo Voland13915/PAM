@@ -1,5 +1,3 @@
-// widgets/price_history_chart.dart
-// Простая столбчатая диаграмма из Container-ов, без внешних пакетов.
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../utils/formatters.dart';
@@ -22,7 +20,6 @@ class PriceHistoryChart extends StatelessWidget {
     final minPrice = prices.reduce(min);
     final range = prices.reduce(max) - minPrice;
 
-    // Высота столбца: от 30 (минимум) до 100 (максимум).
     double barHeight(double price) =>
         range == 0 ? 60 : 30 + 70 * (price - minPrice) / range;
 

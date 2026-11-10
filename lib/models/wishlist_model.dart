@@ -1,6 +1,3 @@
-// models/wishlist_model.dart — разделяемое состояние «Избранного»:
-// слежения за ценой. Их пишет форма «Следить за ценой», читают вкладка
-// «Избранное», детали товара (сердечко) и профиль (счётчик).
 import 'package:flutter/foundation.dart';
 
 import '../data/result.dart';
@@ -8,9 +5,9 @@ import '../data/wishlist_item.dart';
 import '../data/wishlist_repository.dart';
 
 class WishlistModel extends ChangeNotifier {
-  WishlistModel(this._repository); // DI через конструктор
+  WishlistModel(this._repository);
 
-  final WishlistRepository _repository; // тип — интерфейс, не mock
+  final WishlistRepository _repository;
 
   bool _loading = false;
   String? _error;
@@ -20,7 +17,6 @@ class WishlistModel extends ChangeNotifier {
   String? get error => _error;
   List<WishlistItem> get items => List.unmodifiable(_items);
 
-  /// Слежение за конкретным товаром или null, если его нет.
   WishlistItem? byProduct(int productId) {
     for (final item in _items) {
       if (item.productId == productId) return item;
@@ -44,17 +40,14 @@ class WishlistModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Мутации: вердикт хранилища → мутация → извещение.
-  // Конвенция возврата как у validator (C6): null — успех, текст — ошибка.
-
   Future<String?> add(WishlistItem draft) async {
     switch (await _repository.create(draft)) {
       case Ok(:final value):
-        _items = [..._items, value]; // с id-ом, выданным хранилищем
+        _items = [..._items, value];
         notifyListeners();
         return null;
       case Err(:final msg):
-        return msg; // состояние нетронуто — экран решает, что показать
+        return msg;
     }
   }
 

@@ -1,5 +1,3 @@
-// widgets/product_image.dart
-// Заглушка изображения: иконка категории на фоне из темы.
 import 'package:flutter/material.dart';
 
 class ProductImage extends StatelessWidget {

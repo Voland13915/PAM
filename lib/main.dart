@@ -1,5 +1,3 @@
-// main.dart — корень композиции: ЗДЕСЬ (и только здесь) выбирается
-// источник данных. На L5: http-реализации вместо mock-ов — и всё.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -22,11 +20,7 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        // Леса демонстрации аварии (переключатель в профиле) — исчезают на L5.
-        // Не ChangeNotifier и освобождать нечего, поэтому .value оправдан.
         Provider<MockNetwork>.value(value: network),
-        // Модели — фабрикой (C7): Provider создаёт лениво и сам вызывает
-        // dispose; каскад ..load() запускает первую загрузку.
         ChangeNotifierProvider(
           create: (_) => CatalogModel(productRepository, storeRepository)
             ..load(),
@@ -37,7 +31,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ShoppingListModel()),
         ChangeNotifierProvider(create: (_) => SessionModel()),
       ],
-      child: const MyApp(), // MaterialApp.router — нетронут с L3
+      child: const MyApp(),
     ),
   );
 }
@@ -51,8 +45,6 @@ class MyApp extends StatelessWidget {
       title: 'TechPrice',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Сине-зелёный: ассоциация с экономией и при этом нейтральный
-        // к фирменным цветам магазинов (Bomba, Maximum и др.).
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF00796B),
         ),
