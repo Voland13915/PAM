@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/auth_api.dart';
-import '../data/mock_network.dart';
 import '../data/product.dart';
 import '../models/catalog_model.dart';
 import '../models/session_model.dart';
@@ -144,16 +143,13 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
 
-          const SectionTitle('Демонстрация (L4)'),
-          const Card(child: _NetworkFailureSwitch()),
-
           const SectionTitle('О приложении'),
           const Card(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
                 children: [
-                  InfoRow(label: 'Версия', value: '0.4.0 (L4)'),
+                  InfoRow(label: 'Версия', value: '0.5.0 (L5)'),
                   InfoRow(label: 'Валюта', value: 'MDL'),
                 ],
               ),
@@ -168,37 +164,6 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _NetworkFailureSwitch extends StatefulWidget {
-  const _NetworkFailureSwitch();
-
-  @override
-  State<_NetworkFailureSwitch> createState() => _NetworkFailureSwitchState();
-}
-
-class _NetworkFailureSwitchState extends State<_NetworkFailureSwitch> {
-  late bool _enabled;
-
-  @override
-  void initState() {
-    super.initState();
-    _enabled = context.read<MockNetwork>().simulateError;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      secondary: const Icon(Icons.cloud_off_outlined),
-      title: const Text('Симулировать сбой сети'),
-      subtitle: const Text('Любой запрос к хранилищу вернёт ошибку'),
-      value: _enabled,
-      onChanged: (value) {
-        setState(() => _enabled = value);
-        context.read<MockNetwork>().simulateError = value;
-      },
     );
   }
 }

@@ -3,10 +3,11 @@ import 'package:provider/provider.dart';
 
 import 'data/api_client.dart';
 import 'data/auth_api.dart';
-import 'data/mock_network.dart';
-import 'data/mock_product_repository.dart';
-import 'data/mock_store_repository.dart';
-import 'data/mock_wishlist_repository.dart';
+import 'data/auth_user.dart';
+import 'data/http_product_repository.dart';
+import 'data/http_store_repository.dart';
+import 'data/http_wishlist_repository.dart';
+import 'data/result.dart';
 import 'data/token_store.dart';
 import 'models/catalog_model.dart';
 import 'models/session_model.dart';
@@ -23,33 +24,48 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final tokens = TokenStore();
-  final auth = AuthApi(ApiClient(apiBase, tokens), tokens);
-  final loggedIn = await tokens.read() != null;
-  router = createRouter(loggedIn ? '/catalog' : '/login');
+  final api = ApiClient(apiBase, tokens);
+  final auth = AuthApi(api, tokens);
 
-  final network = MockNetwork();
-  final productRepository = MockProductRepository(network);
-  final storeRepository = MockStoreRepository(network);
-  final wishlistRepository = MockWishlistRepository(network);
+  final user = await _currentUser(tokens, auth);
+  final loggedIn = await tokens.read() != null;
+
+  router = createRouter(loggedIn ? '/catalog' : '/login');
+  api.onUnauthorized = () => router.go('/login');
+
+  final productRepository = HttpProductRepository(api);
+  final storeRepository = HttpStoreRepository(api);
+  final wishlistRepository = HttpWishlistRepository(api);
 
   runApp(
     MultiProvider(
       providers: [
         Provider<AuthApi>.value(value: auth),
-        Provider<MockNetwork>.value(value: network),
         ChangeNotifierProvider(
           create: (_) => CatalogModel(productRepository, storeRepository)
-            ..load(),
+            ..load(), // DI — как на L4
         ),
         ChangeNotifierProvider(
           create: (_) => WishlistModel(wishlistRepository)..load(),
         ),
         ChangeNotifierProvider(create: (_) => ShoppingListModel()),
-        ChangeNotifierProvider(create: (_) => SessionModel()),
+        ChangeNotifierProvider(create: (_) {
+          final session = SessionModel();
+          if (user != null) session.register(user.name, user.email);
+          return session;
+        }),
       ],
       child: const MyApp(),
     ),
   );
+}
+
+Future<AuthUser?> _currentUser(TokenStore tokens, AuthApi auth) async {
+  if (await tokens.read() == null) return null;
+  return switch (await auth.me()) {
+    Ok(:final value) => value,
+    Err() => null,
+  };
 }
 
 class MyApp extends StatelessWidget {
