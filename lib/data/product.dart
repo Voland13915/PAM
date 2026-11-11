@@ -7,6 +7,20 @@ class Offer {
   final bool inStock;
 
   const Offer(this.storeId, this.price, {this.oldPrice, this.inStock = true});
+
+  factory Offer.fromJson(Map<String, dynamic> j) => Offer(
+        j['storeId'] as int,
+        (j['price'] as num).toDouble(),
+        oldPrice: (j['oldPrice'] as num?)?.toDouble(),
+        inStock: j['inStock'] as bool? ?? true,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'storeId': storeId,
+        'price': price,
+        'oldPrice': oldPrice,
+        'inStock': inStock,
+      };
 }
 
 class Product {
@@ -27,6 +41,30 @@ class Product {
     required this.offers,
     required this.priceHistory,
   });
+
+  factory Product.fromJson(Map<String, dynamic> j) => Product(
+        id: j['id'] as int,
+        name: j['name'] as String,
+        brand: j['brand'] as String? ?? '',
+        category: j['category'] as String,
+        specs: (j['specs'] as Map<String, dynamic>? ?? const {})
+            .map((key, value) => MapEntry(key, value as String)),
+        offers: (j['offers'] as List)
+            .map((e) => Offer.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        priceHistory: (j['priceHistory'] as List? ?? const [])
+            .map((e) => (e as num).toDouble())
+            .toList(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'brand': brand,
+        'category': category,
+        'specs': specs,
+        'offers': [for (final o in offers) o.toJson()],
+        'priceHistory': priceHistory,
+      };
 
   Product copyWith({int? id}) => Product(
         id: id ?? this.id,
