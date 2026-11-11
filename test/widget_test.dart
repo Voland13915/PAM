@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tech_price/main.dart';
+import 'package:tech_price/router.dart';
 
 void main() {
+  setUpAll(() => router = createRouter('/login'));
+
   testWidgets('Приложение стартует на экране входа', (tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();

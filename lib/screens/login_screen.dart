@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/auth_api.dart';
+import '../data/auth_user.dart';
+import '../data/result.dart';
+import '../models/catalog_model.dart';
 import '../models/session_model.dart';
+import '../models/wishlist_model.dart';
 import '../utils/validators.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -24,9 +30,32 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_busy) return;
     if (!_formKey.currentState!.validate()) return;
-    context.read<SessionModel>().signIn(_emailCtrl.text.trim());
+
+    setState(() => _busy = true);
+    final result = await context
+        .read<AuthApi>()
+        .login(_emailCtrl.text.trim(), _passwordCtrl.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    switch (result) {
+      case Ok(:final value):
+        _enterApp(value);
+      case Err(:final msg):
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+    }
+  }
+
+  void _enterApp(AuthUser user) {
+    context.read<SessionModel>().register(user.name, user.email);
+    final wishlist = context.read<WishlistModel>();
+    if (!wishlist.isLoading) wishlist.load();
+    final catalog = context.read<CatalogModel>();
+    if (catalog.error != null) catalog.load();
     context.go('/catalog');
   }
 
@@ -87,8 +116,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: _submit,
-                child: const Text('Войти'),
+                onPressed: _busy ? null : _submit,
+                child: _busy
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Войти'),
               ),
               const SizedBox(height: 8),
               TextButton(

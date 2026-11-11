@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/auth_api.dart';
+import '../data/result.dart';
+import '../models/catalog_model.dart';
 import '../models/session_model.dart';
+import '../models/wishlist_model.dart';
 import '../utils/validators.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -28,15 +32,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  bool _busy = false;
+
+  Future<void> _submit() async {
+    if (_busy) return;
     if (!_formKey.currentState!.validate()) return;
-    context
-        .read<SessionModel>()
-        .register(_nameCtrl.text.trim(), _emailCtrl.text.trim());
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Аккаунт создан: ${_nameCtrl.text.trim()}')),
-    );
-    context.go('/catalog');
+
+    setState(() => _busy = true);
+    final result = await context.read<AuthApi>().register(
+          _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+          _nameCtrl.text.trim(),
+        );
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    switch (result) {
+      case Ok(:final value):
+        context.read<SessionModel>().register(value.name, value.email);
+        final wishlist = context.read<WishlistModel>();
+        if (!wishlist.isLoading) wishlist.load();
+        final catalog = context.read<CatalogModel>();
+        if (catalog.error != null) catalog.load();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Аккаунт создан: ${value.name}')),
+        );
+        context.go('/catalog');
+      case Err(:final msg):
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   @override
@@ -103,8 +128,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _submit,
-              child: const Text('Зарегистрироваться'),
+              onPressed: _busy ? null : _submit,
+              child: _busy
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Зарегистрироваться'),
             ),
           ],
         ),

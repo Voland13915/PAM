@@ -4,10 +4,10 @@ import 'screens/catalog_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/register_screen.dart';
+import 'screens/register_screen.dart'; // [шаг 5]
 import 'screens/shopping_list_screen.dart';
 import 'screens/stores_screen.dart';
-import 'screens/track_price_screen.dart';
+import 'screens/track_price_screen.dart'; // [шаг 6]
 import 'screens/wishlist_screen.dart';
 import 'widgets/app_shell.dart';
 
@@ -28,13 +28,16 @@ GoRoute _productRoute(String base) => GoRoute(
       ],
     );
 
-final router = GoRouter(
-  initialLocation: '/login',
+late final GoRouter router;
+
+GoRouter createRouter(String initialLocation) => GoRouter(
+  initialLocation: initialLocation,
   routes: [
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
+    // [шаг 5] начало
     GoRoute(
       path: '/register',
       builder: (context, state) => const RegisterScreen(),

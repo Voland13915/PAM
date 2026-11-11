@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../data/auth_api.dart';
 import '../data/mock_network.dart';
 import '../data/product.dart';
 import '../models/catalog_model.dart';
@@ -31,10 +32,12 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      context.read<SessionModel>().signOut();
-      context.go('/login');
-    }
+    if (ok != true || !context.mounted) return;
+    await context.read<AuthApi>().logout();
+    if (!context.mounted) return;
+    context.read<ShoppingListModel>().clear();
+    context.read<SessionModel>().signOut();
+    context.go('/login');
   }
 
   @override
@@ -54,6 +57,9 @@ class ProfileScreen extends StatelessWidget {
         .map(catalog.byId)
         .whereType<Product>()
         .fold<double>(0, (sum, p) => sum + p.priceSpread);
+
+    final loading = catalog.isLoading || wishlist.isLoading;
+    final loadError = catalog.error ?? wishlist.error;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Профиль')),
@@ -80,15 +86,38 @@ class ProfileScreen extends StatelessWidget {
           Row(
             children: [
               _StatTile(
-                value: wishlist.isLoading ? '…' : '${wishlist.items.length}',
+                value: wishlist.isLoading
+                    ? '…'
+                    : wishlist.error != null
+                        ? '—'
+                        : '${wishlist.items.length}',
                 label: 'в избранном',
               ),
               const SizedBox(width: 8),
               _StatTile(value: '${shopping.count}', label: 'в списке'),
               const SizedBox(width: 8),
-              _StatTile(value: formatPrice(savings), label: 'экономия'),
+              _StatTile(
+                value: catalog.isLoading
+                    ? '…'
+                    : catalog.error != null
+                        ? '—'
+                        : formatPrice(savings),
+                label: 'экономия',
+              ),
             ],
           ),
+          if (!loading && loadError != null) ...[
+            const SizedBox(height: 12),
+            _LoadErrorCard(
+              message: loadError,
+              onRetry: () {
+                if (catalog.error != null) context.read<CatalogModel>().load();
+                if (wishlist.error != null) {
+                  context.read<WishlistModel>().load();
+                }
+              },
+            ),
+          ],
 
           const SectionTitle('Настройки'),
           Card(
@@ -105,7 +134,9 @@ class ProfileScreen extends StatelessWidget {
                   title: const Text('Отслеживаемые магазины'),
                   subtitle: Text(catalog.isLoading
                       ? 'загружается…'
-                      : '${catalog.stores.length} магазинов'),
+                      : catalog.error != null
+                          ? 'не удалось загрузить'
+                          : '${catalog.stores.length} магазинов'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/profile/stores'),
                 ),
@@ -168,6 +199,41 @@ class _NetworkFailureSwitchState extends State<_NetworkFailureSwitch> {
         setState(() => _enabled = value);
         context.read<MockNetwork>().simulateError = value;
       },
+    );
+  }
+}
+
+class _LoadErrorCard extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _LoadErrorCard({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      color: scheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, color: scheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: scheme.onErrorContainer),
+              ),
+            ),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Повторить'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
