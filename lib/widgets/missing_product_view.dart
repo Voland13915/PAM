@@ -11,15 +11,15 @@ class MissingProductView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = context.watch<CatalogModel>(); // watch в build
+    final catalog = context.watch<CatalogModel>();
 
     final Widget body;
-    if (catalog.isLoading) {
+    if (catalog.isLoading || catalog.isResolving) {
       body = const Center(child: CircularProgressIndicator());
     } else if (catalog.error != null) {
       body = ErrorView(
         message: catalog.error!,
-        onRetry: () => context.read<CatalogModel>().load(), // read: действие
+        onRetry: () => context.read<CatalogModel>().load(),
       );
     } else {
       body = const Center(child: Text('Товар не существует'));
