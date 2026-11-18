@@ -1,3 +1,5 @@
+import 'package:tech_price/data/catalog_facets.dart';
+import 'package:tech_price/data/catalog_filter.dart';
 import 'package:tech_price/data/product.dart';
 import 'package:tech_price/data/product_repository.dart';
 import 'package:tech_price/data/result.dart';
@@ -26,17 +28,46 @@ class FakeProductRepository implements ProductRepository {
   bool fail = false;
   final List<int> requestedPages = [];
 
+  CatalogFilter lastFilter = const CatalogFilter();
+
+  List<Product> _matching(String? search, CatalogFilter filter) => items
+      .where((p) =>
+          search == null ||
+          search.isEmpty ||
+          p.name.toLowerCase().contains(search.toLowerCase()))
+      .where((p) => filter.category.isEmpty || p.category == filter.category)
+      .toList();
+
   @override
-  Future<Result<List<Product>>> fetchAll(
-      {int page = 1, int limit = 20, String? search}) async {
+  Future<Result<List<Product>>> fetchAll({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    CatalogFilter filter = const CatalogFilter(),
+  }) async {
     requestedPages.add(page);
+    lastFilter = filter;
     if (fail) return const Err(failure);
-    final filtered = search == null || search.isEmpty
-        ? items
-        : items
-            .where((p) => p.name.toLowerCase().contains(search.toLowerCase()))
-            .toList();
+    final filtered = _matching(search, filter);
     return Ok(filtered.skip((page - 1) * limit).take(limit).toList());
+  }
+
+  @override
+  Future<Result<CatalogFacets>> fetchFacets({
+    String? search,
+    CatalogFilter filter = const CatalogFilter(),
+  }) async {
+    if (fail) return const Err(failure);
+    final counts = <String, int>{};
+    for (final p in _matching(search, const CatalogFilter())) {
+      counts[p.category] = (counts[p.category] ?? 0) + 1;
+    }
+    return Ok(CatalogFacets(
+      categories: [
+        for (final e in counts.entries) FacetValue(e.key, e.value),
+      ],
+      total: _matching(search, filter).length,
+    ));
   }
 
   @override
@@ -46,6 +77,16 @@ class FakeProductRepository implements ProductRepository {
       if (p.id == id) return Ok(p);
     }
     return const Err('Запись не существует');
+  }
+
+  final Map<int, List<String>> images = {};
+  int imageRequests = 0;
+
+  @override
+  Future<Result<List<String>>> fetchImages(int id) async {
+    imageRequests++;
+    if (fail) return const Err(failure);
+    return Ok(images[id] ?? const []);
   }
 
   @override

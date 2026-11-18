@@ -1,24 +1,29 @@
 import argparse
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from . import catalog
 from .db import conn
-from .matching import display_name, match_parts, trimmed_keys
+from .grouping import Entry, cluster, comparable_fields
+from .matching import brand_from_title, match_parts, model_and_memory, product_name, trimmed_keys
+from .specs import DISPLAY_ORDER, Specs, parse_specs
 
 
-def rematch() -> Dict[str, int]:
-    offers = conn.execute(
-        "SELECT o.id, o.product_id, o.title, p.category, p.brand "
-        "FROM offers o JOIN products p ON p.id = o.product_id "
-        "WHERE o.external_id NOT LIKE 'manual-%' AND o.external_id NOT LIKE 'demo-%' "
-        "AND o.title != '' ORDER BY o.id"
-    ).fetchall()
+def _brand(offer) -> str:
+    return brand_from_title(offer["title"]) or offer["brand"]
 
-    parts = [(o,) + match_parts(o["category"], o["brand"], o["title"]) for o in offers]
-    bases = {base for _, base, _, _ in parts}
+
+def _groups(offers) -> Dict[str, Tuple[List, Specs]]:
+    parts = []
+    for offer in offers:
+        brand = _brand(offer)
+        base, _, _ = match_parts(offer["category"], brand, offer["title"])
+        parts.append((offer, brand, base))
+
+    bases = {base for _, _, base in parts}
     alias: Dict[str, str] = {}
     for base in bases:
         alias[base] = next((t for t in trimmed_keys(base) if t in bases), base)
@@ -28,20 +33,33 @@ def rematch() -> Dict[str, int]:
             key = alias[key]
         return key
 
-    by_base: Dict[str, List] = defaultdict(list)
-    for offer, base, full, ram in parts:
+    entries: Dict[str, List[Entry]] = defaultdict(list)
+    for offer, brand, base in parts:
         root = resolve(base)
-        if root != base:
-            pieces = full.split("|")
-            pieces[1] = root.split("|")[1]
-            full = "|".join(pieces)
-        by_base[root].append((offer, full, ram))
+        _, memory = model_and_memory(offer["title"], brand)
+        specs = parse_specs(offer["category"], offer["details"], memory, offer["title"])
+        fields = comparable_fields(offer["category"], root, brand.lower() == "apple")
+        entries[root].append(Entry(offer, root, offer["category"], specs, fields))
 
-    groups: Dict[str, List] = defaultdict(list)
-    for base, members in by_base.items():
-        rams = {ram for _, _, ram in members if ram is not None}
-        for offer, full, ram in members:
-            groups[base if len(rams) <= 1 else full].append(offer)
+    groups: Dict[str, Tuple[List, Specs]] = {}
+    for members in entries.values():
+        for key, cluster_members, specs in cluster(members):
+            groups[key] = ([e.item for e in cluster_members], specs)
+    return groups
+
+
+def _ordered_specs(specs: Specs) -> Dict[str, str]:
+    return {label: specs.display[label] for label in DISPLAY_ORDER if label in specs.display}
+
+
+def rematch() -> Dict[str, int]:
+    offers = conn.execute(
+        "SELECT o.id, o.product_id, o.title, o.details, o.in_stock, p.category, p.brand "
+        "FROM offers o JOIN products p ON p.id = o.product_id "
+        "WHERE o.external_id NOT LIKE 'manual-%' AND o.external_id NOT LIKE 'demo-%' "
+        "AND o.title != '' ORDER BY o.id"
+    ).fetchall()
+    groups = _groups(offers)
 
     old_keys = {
         r["match_key"]: r["id"]
@@ -56,18 +74,21 @@ def rematch() -> Dict[str, int]:
         )
         used = set()
         redirect: Dict[int, int] = {}
-        for key, group in sorted(groups.items(), key=lambda kv: min(o["id"] for o in kv[1])):
+        for key, (group, specs) in sorted(
+            groups.items(), key=lambda kv: min(o["id"] for o in kv[1][0])
+        ):
             candidates = [old_keys.get(key)] + sorted({o["product_id"] for o in group})
             target = next((p for p in candidates if p in affected and p not in used), None)
             first = group[0]
+            name = product_name(first["category"], [o["title"] for o in group], specs)
             if target is None:
-                target = catalog.create_product(
-                    display_name(first["title"]), first["brand"], first["category"]
-                )
+                target = catalog.create_product(name, _brand(first), first["category"])
             used.add(target)
             conn.execute(
-                "UPDATE products SET match_key = ?, name = ? WHERE id = ?",
-                (key, display_name(first["title"]), target),
+                "UPDATE products SET match_key = ?, name = ?, specs = ?, "
+                "brand = COALESCE(NULLIF(?, ''), brand) WHERE id = ?",
+                (key, name, json.dumps(_ordered_specs(specs), ensure_ascii=False),
+                 _brand(first), target),
             )
             for offer in group:
                 if offer["product_id"] != target:

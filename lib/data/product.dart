@@ -35,8 +35,8 @@ class Product {
   final Map<String, String> specs;
   final List<Offer> offers;
   final List<double> priceHistory;
-
   final List<DateTime> priceHistoryDates;
+  final String imageUrl;
 
   const Product({
     required this.id,
@@ -47,6 +47,7 @@ class Product {
     required this.offers,
     required this.priceHistory,
     this.priceHistoryDates = const [],
+    this.imageUrl = '',
   });
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -65,6 +66,7 @@ class Product {
         priceHistoryDates: (j['priceHistoryDates'] as List? ?? const [])
             .map((e) => DateTime.parse(e as String))
             .toList(),
+        imageUrl: j['imageUrl'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +87,7 @@ class Product {
         offers: offers,
         priceHistory: priceHistory,
         priceHistoryDates: priceHistoryDates,
+        imageUrl: imageUrl,
       );
 
   List<Offer> get inStockOffers => offers.where((o) => o.inStock).toList();

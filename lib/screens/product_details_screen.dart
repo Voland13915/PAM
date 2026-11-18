@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/catalog_model.dart';
 import '../models/shopping_list_model.dart';
@@ -10,7 +11,7 @@ import '../widgets/info_row.dart';
 import '../widgets/missing_product_view.dart';
 import '../widgets/price_history_chart.dart';
 import '../widgets/price_row.dart';
-import '../widgets/product_image.dart';
+import '../widgets/product_gallery.dart';
 
 class ProductDetailsScreen extends StatelessWidget {
   final int productId;
@@ -25,6 +26,15 @@ class ProductDetailsScreen extends StatelessWidget {
   void _snack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openInStore(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    final opened = uri != null &&
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      _snack(context, 'Не удалось открыть страницу магазина');
+    }
   }
 
   @override
@@ -44,7 +54,9 @@ class ProductDetailsScreen extends StatelessWidget {
 
     final best = product.bestOffer;
     final offers = [...product.offers]
-      ..sort((a, b) => a.price.compareTo(b.price));
+      ..sort((a, b) => a.inStock == b.inStock
+          ? a.price.compareTo(b.price)
+          : (a.inStock ? -1 : 1));
 
     return Scaffold(
       appBar: AppBar(
@@ -60,8 +72,11 @@ class ProductDetailsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Center(
-            child: ProductImage(category: product.category, size: 160),
+          ProductGallery(
+            key: ValueKey(product.id),
+            productId: product.id,
+            category: product.category,
+            fallbackUrl: product.imageUrl,
           ),
           const SizedBox(height: 16),
           Text(product.name, style: text.headlineSmall),
@@ -86,7 +101,9 @@ class ProductDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Дешевле всего в ${catalog.storeName(best.storeId)}',
+                          product.isAvailable
+                              ? 'Дешевле всего в ${catalog.storeName(best.storeId)}'
+                              : 'Сейчас нет в наличии · последняя цена',
                           style: text.bodyMedium
                               ?.copyWith(color: scheme.onPrimaryContainer),
                         ),
@@ -123,6 +140,9 @@ class ProductDetailsScreen extends StatelessWidget {
                     oldPrice: offer.oldPrice,
                     isBest: offer == best,
                     inStock: offer.inStock,
+                    onTap: offer.url.isEmpty
+                        ? null
+                        : () => _openInStore(context, offer.url),
                   ),
               ],
             ),
@@ -172,6 +192,7 @@ class ProductDetailsScreen extends StatelessWidget {
               Expanded(
                 child: inList
                     ? FilledButton.tonalIcon(
+                        // read в callback-е: действие, а не подписка
                         onPressed: () {
                           context.read<ShoppingListModel>().remove(productId);
                           _snack(context, 'Убрано из списка покупок');

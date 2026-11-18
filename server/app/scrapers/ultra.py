@@ -3,7 +3,8 @@ from typing import Dict, Iterator, List, Optional
 
 from bs4 import BeautifulSoup
 
-from .base import Fetcher, PageNotFound, ParseError, ScrapedItem
+from ..matching import brand_from_title
+from .base import Fetcher, PageNotFound, ParseError, ScrapedItem, pick_image
 
 STORE = ("ultra", "Ultra", "ultra.md")
 BASE_URL = "https://ultra.md"
@@ -20,7 +21,7 @@ _SPECS = ".product-card__specs-title"
 _PRICE_CURRENT = ".product-card__current-price"
 _PRICE_OLD = ".product-card__old-price"
 _UNPRICED = ".product-card__footer--unpriced"
-_TYPE_WORDS = {"смартфон", "ноутбук", "ультрабук", "игровой"}
+_ADD_TO_CART = ".product-card__add-to-cart"
 _MEMORY = re.compile(r"(\d+)\s*ГБ\s*/\s*(\d+)\s*(ГБ|ТБ)", re.IGNORECASE)
 
 
@@ -29,13 +30,6 @@ def _number(text: Optional[str]) -> Optional[float]:
         return None
     digits = re.sub(r"[^\d]", "", text)
     return float(digits) if digits else None
-
-
-def _brand(title: str) -> str:
-    words = title.split()
-    while words and words[0].lower() in _TYPE_WORDS:
-        words = words[1:]
-    return words[0] if words else ""
 
 
 def _memory(specs: str) -> str:
@@ -80,11 +74,13 @@ def parse_listing(html: str) -> List[ScrapedItem]:
         items.append(ScrapedItem(
             external_id=code,
             title=title + (" " + memory if memory else ""),
-            brand=_brand(title),
+            brand=brand_from_title(title),
             price=price,
             old_price=old_price if old_price and old_price > price else None,
             url=href if href.startswith("http") else BASE_URL + href,
+            in_stock=card.select_one(_ADD_TO_CART) is not None,
             details=specs,
+            image_url=pick_image(card, BASE_URL),
         ))
     return items
 

@@ -1,10 +1,15 @@
+# Python tooling
 .venv/
 __pycache__/
 *.pyc
 
+# Runtime data (created automatically on first start)
 app.db
 app.db-*
 uploads/
 
+# Страницы, сохранённые парсером (--save-html pages)
 pages/
 matching_report.txt
+offers.csv
+product_pages/

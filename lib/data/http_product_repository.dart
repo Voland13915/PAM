@@ -1,4 +1,6 @@
 import 'api_client.dart';
+import 'catalog_facets.dart';
+import 'catalog_filter.dart';
 import 'product.dart';
 import 'product_repository.dart';
 import 'result.dart';
@@ -16,6 +18,7 @@ class HttpProductRepository implements ProductRepository {
     int page = 1,
     int limit = 20,
     String? search,
+    CatalogFilter filter = const CatalogFilter(),
   }) =>
       _api.send(
         'GET',
@@ -24,13 +27,40 @@ class HttpProductRepository implements ProductRepository {
           'page': '$page',
           'limit': '$limit',
           if (search != null && search.isNotEmpty) 'search': search,
+          ...filter.toQuery(),
         },
         parse: (json) => pageItems(json, Product.fromJson),
       );
 
   @override
+  Future<Result<CatalogFacets>> fetchFacets({
+    String? search,
+    CatalogFilter filter = const CatalogFilter(),
+  }) =>
+      _api.send(
+        'GET',
+        '/products/facets',
+        query: {
+          if (search != null && search.isNotEmpty) 'search': search,
+          ...filter.toQuery(),
+        },
+        parse: (json) => CatalogFacets.fromJson(json as Map<String, dynamic>),
+      );
+
+  @override
   Future<Result<Product>> fetchById(int id) =>
       _api.send('GET', '/products/$id', parse: _product);
+
+  @override
+  Future<Result<List<String>>> fetchImages(int id) => _api.send(
+        'GET',
+        '/products/$id/images',
+        timeout: const Duration(seconds: 25),
+        parse: (json) => [
+          for (final url in (json as Map<String, dynamic>)['images'] as List)
+            url as String,
+        ],
+      );
 
   @override
   Future<Result<Product>> create(Product product) => _api.send(

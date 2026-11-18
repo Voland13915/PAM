@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/catalog_facets.dart';
+import '../data/catalog_filter.dart';
 import '../data/product.dart';
 import '../data/product_repository.dart';
 import '../data/result.dart';
@@ -20,6 +22,8 @@ class CatalogModel extends ChangeNotifier {
   List<Store> _stores = const [];
 
   String _search = '';
+  CatalogFilter _filter = const CatalogFilter();
+  CatalogFacets _facets = CatalogFacets.empty;
   int _page = 1;
   bool _hasMore = false;
   bool _loadingMore = false;
@@ -27,12 +31,15 @@ class CatalogModel extends ChangeNotifier {
   int _generation = 0;
 
   final Map<int, Product> _known = {};
+  final Map<int, List<String>> _images = {};
   final Set<int> _resolving = {};
   final Set<int> _missing = {};
 
   bool get isLoading => _loading;
   String? get error => _error;
   String get search => _search;
+  CatalogFilter get filter => _filter;
+  CatalogFacets get facets => _facets;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _loadingMore;
   String? get loadMoreError => _loadMoreError;
@@ -43,7 +50,7 @@ class CatalogModel extends ChangeNotifier {
   List<Store> get stores => List.unmodifiable(_stores);
 
   List<String> get categories =>
-      List.unmodifiable(_products.map((p) => p.category).toSet());
+      List.unmodifiable(_facets.categories.map((c) => c.name));
 
   Product? byId(int id) {
     final known = _known[id];
@@ -61,10 +68,27 @@ class CatalogModel extends ChangeNotifier {
 
   String storeName(int id) => storeById(id)?.name ?? '—';
 
+  Future<List<String>> images(int productId) async {
+    final cached = _images[productId];
+    if (cached != null) return cached;
+    switch (await _productRepository.fetchImages(productId)) {
+      case Ok(:final value):
+        _images[productId] = value;
+        return value;
+      case Err():
+        return const [];
+    }
+  }
+
+  Future<void> applyFilter(CatalogFilter filter) {
+    _filter = filter;
+    return load();
+  }
+
   Future<void> load({String? search}) async {
     _search = search ?? _search;
     _page = 1;
-    _generation++;
+    final generation = ++_generation;
     _loading = true;
     _error = null;
     _loadMoreError = null;
@@ -72,10 +96,17 @@ class CatalogModel extends ChangeNotifier {
     notifyListeners();
 
     final productsFuture = _productRepository.fetchAll(
-        page: 1, limit: pageSize, search: _search);
+        page: 1, limit: pageSize, search: _search, filter: _filter);
+    final facetsFuture =
+        _productRepository.fetchFacets(search: _search, filter: _filter);
     final storesFuture = _storeRepository.fetchAll();
 
-    switch (await productsFuture) {
+    final products = await productsFuture;
+    final facets = await facetsFuture;
+    final stores = await storesFuture;
+    if (generation != _generation) return;
+
+    switch (products) {
       case Ok(:final value):
         _products = value;
         _hasMore = value.length == pageSize;
@@ -83,11 +114,14 @@ class CatalogModel extends ChangeNotifier {
       case Err(:final msg):
         _error = msg;
     }
-    switch (await storesFuture) {
+    switch (stores) {
       case Ok(:final value):
         _stores = value;
       case Err(:final msg):
         _error ??= msg;
+    }
+    if (facets case Ok(:final value)) {
+      _facets = value;
     }
 
     _loading = false;
@@ -102,7 +136,7 @@ class CatalogModel extends ChangeNotifier {
     final generation = _generation;
 
     final result = await _productRepository.fetchAll(
-        page: _page + 1, limit: pageSize, search: _search);
+        page: _page + 1, limit: pageSize, search: _search, filter: _filter);
     if (generation != _generation) {
       _loadingMore = false;
       notifyListeners();

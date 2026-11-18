@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
 import httpx
@@ -35,6 +35,25 @@ class ScrapedItem:
     url: str = ""
     in_stock: bool = True
     details: str = ""
+    image_url: str = ""
+
+
+_IMAGE_ATTRIBUTES = ("data-src", "data-lazy-src", "data-original", "data-srcset", "srcset", "src")
+
+
+def pick_image(card, base_url: str) -> str:
+    for img in card.find_all("img"):
+        for attribute in _IMAGE_ATTRIBUTES:
+            value = (img.get(attribute) or "").strip()
+            if not value:
+                continue
+            value = value.split(",")[0].split()[0]
+            lower = value.lower()
+            if lower.startswith("data:") or lower.endswith(".svg") or "lazy" in lower \
+                    or "placeholder" in lower or "blank" in lower:
+                continue
+            return urljoin(base_url + "/", value)
+    return ""
 
 
 class Fetcher:

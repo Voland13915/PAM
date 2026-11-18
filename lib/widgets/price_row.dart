@@ -8,6 +8,7 @@ class PriceRow extends StatelessWidget {
   final bool isBest;
   final bool inStock;
   final String? subtitle;
+  final VoidCallback? onTap;
 
   const PriceRow({
     super.key,
@@ -17,6 +18,7 @@ class PriceRow extends StatelessWidget {
     this.isBest = false,
     this.inStock = true,
     this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -37,13 +39,14 @@ class PriceRow extends StatelessWidget {
             : scheme.onSurface;
 
     return ListTile(
+      onTap: onTap,
       leading: Icon(
         isBest ? Icons.verified : Icons.storefront_outlined,
         color: isBest ? scheme.primary : scheme.onSurfaceVariant,
       ),
       title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        subtitle ?? status,
+        onTap == null ? subtitle ?? status : '${subtitle ?? status} · на сайт',
         style: text.bodySmall?.copyWith(
           color: inStock ? scheme.onSurfaceVariant : scheme.error,
         ),

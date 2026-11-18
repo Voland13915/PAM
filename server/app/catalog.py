@@ -85,8 +85,18 @@ def product_to_json(row) -> Dict[str, Any]:
         "offers": offers_json(row["id"]),
         "priceHistory": prices,
         "priceHistoryDates": dates,
+        "imageUrl": image_url(row["id"]),
         "createdAt": row["created_at"],
     }
+
+
+def image_url(product_id: int) -> str:
+    row = conn.execute(
+        "SELECT image_url FROM offers WHERE product_id = ? AND image_url != '' "
+        "ORDER BY in_stock DESC, price LIMIT 1",
+        (product_id,),
+    ).fetchone()
+    return row["image_url"] if row is not None else ""
 
 
 def _same_price(a: float, b: float) -> bool:
@@ -103,6 +113,8 @@ def upsert_offer(
     in_stock: bool = True,
     title: str = "",
     url: str = "",
+    image_url: str = "",
+    details: str = "",
     now: Optional[str] = None,
 ) -> int:
     now = now or now_iso()
@@ -115,8 +127,10 @@ def upsert_offer(
     if row is None:
         offer_id = conn.execute(
             "INSERT INTO offers (product_id, store_id, external_id, title, url, price, "
-            "old_price, in_stock, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (product_id, store_id, external_id, title, url, price, old_price, stock, now),
+            "old_price, in_stock, image_url, details, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (product_id, store_id, external_id, title, url, price, old_price, stock,
+             image_url, details, now),
         ).lastrowid
         changed = True
     else:
@@ -124,8 +138,10 @@ def upsert_offer(
         changed = not _same_price(row["price"], price) or row["in_stock"] != stock
         conn.execute(
             "UPDATE offers SET product_id = ?, title = ?, url = ?, price = ?, "
-            "old_price = ?, in_stock = ?, seen_at = ? WHERE id = ?",
-            (product_id, title, url, price, old_price, stock, now, offer_id),
+            "old_price = ?, in_stock = ?, image_url = COALESCE(NULLIF(?, ''), image_url), "
+            "details = COALESCE(NULLIF(?, ''), details), seen_at = ? WHERE id = ?",
+            (product_id, title, url, price, old_price, stock, image_url, details, now,
+             offer_id),
         )
 
     if changed:

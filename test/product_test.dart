@@ -18,9 +18,11 @@ void main() {
       ],
       'priceHistory': [7199, 6999],
       'priceHistoryDates': ['2026-11-01', '2026-11-12'],
+      'imageUrl': 'https://cdn.ultra.md/images/1.webp',
     });
     expect(p.priceHistoryDates, [DateTime(2026, 11, 1), DateTime(2026, 11, 12)]);
     expect(p.offers.single.url, 'https://bomba.md/ru/product/1');
+    expect(p.imageUrl, 'https://cdn.ultra.md/images/1.webp');
   });
 
   test('Ответ без новых полей тоже читается', () {
@@ -34,6 +36,7 @@ void main() {
     });
     expect(p.priceHistoryDates, isEmpty);
     expect(p.offers.single.url, '');
+    expect(p.imageUrl, '');
   });
 
   test('bestOffer не падает, если товара нет в наличии нигде', () {

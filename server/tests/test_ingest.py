@@ -3,6 +3,7 @@ from pathlib import Path
 import httpx
 
 from app import catalog, ingest, scrape
+from app.rematch import rematch
 from app.db import conn
 from app.scrapers.base import Fetcher, ScrapedItem
 
@@ -67,6 +68,7 @@ def test_same_title_in_two_stores_becomes_one_product():
                           [_laptop("B-9", 100, "Игровой ноутбук Lenovo LOQ 15IAX9 Luna Grey")], now)
         ingest.save_items(maximum, "Ноутбуки",
                           [_laptop("M-9", 90, "Laptop Lenovo LOQ 15IAX9 Luna Grey (83GS005CRK)")], now)
+    rematch()
     assert _offer(bomba, "B-9")["product_id"] == _offer(maximum, "M-9")["product_id"]
 
 
@@ -135,3 +137,25 @@ def test_cli_all_runs_every_automatic_store(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "Maximum / Смартфоны" in out and "Ultra / Смартфоны" in out
     assert "Bomba" not in out
+
+
+def test_details_are_saved_and_exported(tmp_path):
+    from app import export_offers
+
+    store = catalog.get_or_create_store("ultra", "Ultra", "ultra.md")
+    item = ScrapedItem("det-1", "Ноутбук ASUS Vivobook 15 X1502VA Cool Silver", "ASUS", 11490,
+                       details="Intel Core i5-13500H | 16 ГБ | 512 ГБ | 15.6\"")
+    with catalog.transaction():
+        ingest.save_items(store, "Ноутбуки", [item], "2026-11-18T10:00:00.000Z")
+    assert _offer(store, "det-1")["details"] == item.details
+
+    item.details = ""
+    with catalog.transaction():
+        ingest.save_items(store, "Ноутбуки", [item], "2026-11-18T11:00:00.000Z")
+    assert _offer(store, "det-1")["details"] == "Intel Core i5-13500H | 16 ГБ | 512 ГБ | 15.6\""
+
+    out = tmp_path / "offers.csv"
+    assert export_offers.export(out) > 0
+    text = out.read_text(encoding="utf-8-sig")
+    assert text.splitlines()[0] == ",".join(export_offers.COLUMNS)
+    assert "X1502VA" in text and "i5-13500H" in text

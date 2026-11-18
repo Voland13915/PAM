@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE_DIR / "app.db")))
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -45,9 +45,6 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TEXT    NOT NULL
 );
 
--- Предложение: товар в конкретном магазине с текущей ценой.
--- external_id — id товара на сайте магазина, по нему парсер находит запись
--- при следующем проходе.
 CREATE TABLE IF NOT EXISTS offers (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   product_id  INTEGER NOT NULL REFERENCES products (id) ON DELETE CASCADE,
@@ -58,6 +55,10 @@ CREATE TABLE IF NOT EXISTS offers (
   price       REAL    NOT NULL,
   old_price   REAL,
   in_stock    INTEGER NOT NULL DEFAULT 1,
+  image_url   TEXT    NOT NULL DEFAULT '',
+  details     TEXT    NOT NULL DEFAULT '',
+  images      TEXT    NOT NULL DEFAULT '',
+  images_fetched_at TEXT NOT NULL DEFAULT '',
   seen_at     TEXT    NOT NULL,
   UNIQUE (store_id, external_id)
 );
@@ -98,10 +99,13 @@ def _migrate(db: sqlite3.Connection) -> None:
     version = db.execute("PRAGMA user_version").fetchone()[0]
     if version >= SCHEMA_VERSION:
         return
-    has_old_catalog = db.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'products'"
-    ).fetchone()
-    if has_old_catalog:
+
+    def has_table(name: str) -> bool:
+        return db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+        ).fetchone() is not None
+
+    if version < 2 and has_table("products"):
         print("Схема каталога обновлена до версии %d: товары, магазины и "
               "избранное созданы заново." % SCHEMA_VERSION)
         db.executescript(
@@ -111,6 +115,17 @@ def _migrate(db: sqlite3.Connection) -> None:
             "DROP TABLE IF EXISTS products;"
             "DROP TABLE IF EXISTS stores;"
         )
+    elif has_table("offers"):
+        columns = {r[1] for r in db.execute("PRAGMA table_info(offers)")}
+        if "image_url" not in columns:
+            db.execute("ALTER TABLE offers ADD COLUMN image_url TEXT NOT NULL DEFAULT ''")
+        if "details" not in columns:
+            db.execute("ALTER TABLE offers ADD COLUMN details TEXT NOT NULL DEFAULT ''")
+        if "images" not in columns:
+            db.execute("ALTER TABLE offers ADD COLUMN images TEXT NOT NULL DEFAULT ''")
+            db.execute(
+                "ALTER TABLE offers ADD COLUMN images_fetched_at TEXT NOT NULL DEFAULT ''"
+            )
     db.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
 

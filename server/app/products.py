@@ -1,18 +1,13 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from . import catalog
+from . import catalog, gallery
 from .auth import require_auth
 from .db import conn
 from .errors import json_response, not_found, read_json_body, string_field, validation_error
 
 router = APIRouter()
-
-_IN_STOCK = (
-    "EXISTS (SELECT 1 FROM offers o WHERE o.product_id = products.id AND o.in_stock = 1)"
-)
-
 
 def _find(id_param: str):
     try:
@@ -104,26 +99,145 @@ def _save_offers(product_id: int, offers: List[Dict[str, Any]]) -> None:
     )
 
 
+_CATALOG = (
+    "SELECT * FROM (SELECT p.*, "
+    "COALESCE((SELECT MIN(o.price) FROM offers o WHERE o.product_id = p.id AND o.in_stock = 1), "
+    "(SELECT MIN(o.price) FROM offers o WHERE o.product_id = p.id)) AS best_price, "
+    "EXISTS (SELECT 1 FROM offers o WHERE o.product_id = p.id AND o.in_stock = 1) AS available, "
+    "(SELECT COUNT(DISTINCT o.store_id) FROM offers o WHERE o.product_id = p.id "
+    "AND o.in_stock = 1) AS stores, "
+    "(SELECT MAX((o.old_price - o.price) / o.old_price) FROM offers o "
+    "WHERE o.product_id = p.id AND o.in_stock = 1 AND o.old_price > o.price) AS discount "
+    "FROM products p) c WHERE c.best_price IS NOT NULL"
+)
+
+_SORTS = {
+    "default": "c.available DESC, c.stores DESC, c.name COLLATE NOCASE",
+    "price_asc": "c.available DESC, c.best_price ASC, c.name COLLATE NOCASE",
+    "price_desc": "c.available DESC, c.best_price DESC, c.name COLLATE NOCASE",
+    "discount": "c.available DESC, COALESCE(c.discount, 0) DESC, c.best_price ASC",
+    "name": "c.available DESC, c.name COLLATE NOCASE",
+}
+
+
+def _float_or(value: Optional[str]) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _filters(query) -> Dict[str, Any]:
+    brands = [b.strip().lower() for b in query.get("brand", "").split(",") if b.strip()]
+    return {
+        "words": [w for w in query.get("search", "").lower().split() if w],
+        "category": query.get("category", "").strip(),
+        "brands": brands,
+        "store": _int_or(query.get("store"), 0),
+        "min_price": _float_or(query.get("min_price")),
+        "max_price": _float_or(query.get("max_price")),
+        "discount": query.get("discount") in ("1", "true"),
+        "multi": query.get("multi") in ("1", "true"),
+        "unavailable": query.get("unavailable") in ("1", "true"),
+    }
+
+
+def _where(f: Dict[str, Any], skip: tuple = ()) -> Tuple[str, List[Any]]:
+    parts: List[str] = []
+    args: List[Any] = []
+    if not f["unavailable"]:
+        parts.append("c.available = 1")
+    for word in f["words"]:
+        parts.append(
+            "(ULOWER(c.name) LIKE ? OR ULOWER(c.brand) LIKE ? OR ULOWER(c.category) LIKE ? "
+            "OR EXISTS (SELECT 1 FROM offers o WHERE o.product_id = c.id "
+            "AND ULOWER(o.title) LIKE ?))"
+        )
+        args += ["%" + word + "%"] * 4
+    if f["category"] and "category" not in skip:
+        parts.append("c.category = ?")
+        args.append(f["category"])
+    if f["brands"] and "brand" not in skip:
+        parts.append("ULOWER(c.brand) IN (%s)" % ",".join("?" * len(f["brands"])))
+        args += f["brands"]
+    if f["store"] and "store" not in skip:
+        parts.append(
+            "EXISTS (SELECT 1 FROM offers o WHERE o.product_id = c.id "
+            "AND o.store_id = ?" + ("" if f["unavailable"] else " AND o.in_stock = 1") + ")"
+        )
+        args.append(f["store"])
+    if f["min_price"] is not None and "price" not in skip:
+        parts.append("c.best_price >= ?")
+        args.append(f["min_price"])
+    if f["max_price"] is not None and "price" not in skip:
+        parts.append("c.best_price <= ?")
+        args.append(f["max_price"])
+    if f["discount"]:
+        parts.append("c.discount > 0")
+    if f["multi"]:
+        parts.append("c.stores >= 2")
+    return "".join(" AND " + p for p in parts), args
+
+
+@router.get("/products/facets")
+async def product_facets(request: Request, user_id: int = Depends(require_auth)):
+    f = _filters(request.query_params)
+
+    where, args = _where(f, skip=("category",))
+    categories = conn.execute(
+        "SELECT c.category AS name, COUNT(*) AS n FROM (" + _CATALOG + where + ") c "
+        "GROUP BY c.category ORDER BY n DESC", args,
+    ).fetchall()
+
+    where, args = _where(f, skip=("brand",))
+    brands = conn.execute(
+        "SELECT MIN(c.brand) AS name, COUNT(*) AS n FROM (" + _CATALOG + where + ") c "
+        "WHERE c.brand != '' GROUP BY ULOWER(c.brand) ORDER BY n DESC, name", args,
+    ).fetchall()
+
+    where, args = _where(f, skip=("store",))
+    stores = conn.execute(
+        "SELECT o.store_id AS id, COUNT(DISTINCT c.id) AS n FROM (" + _CATALOG + where + ") c "
+        "JOIN offers o ON o.product_id = c.id"
+        + ("" if f["unavailable"] else " AND o.in_stock = 1") + " GROUP BY o.store_id", args,
+    ).fetchall()
+
+    where, args = _where(f, skip=("price",))
+    prices = conn.execute(
+        "SELECT MIN(c.best_price) AS lo, MAX(c.best_price) AS hi FROM (" + _CATALOG + where
+        + ") c", args,
+    ).fetchone()
+
+    where, args = _where(f)
+    total = conn.execute(
+        "SELECT COUNT(*) AS n FROM (" + _CATALOG + where + ") c", args
+    ).fetchone()["n"]
+
+    return json_response({
+        "categories": [{"name": r["name"], "count": r["n"]} for r in categories],
+        "brands": [{"name": r["name"], "count": r["n"]} for r in brands],
+        "stores": [{"id": r["id"], "count": r["n"]} for r in stores],
+        "minPrice": prices["lo"],
+        "maxPrice": prices["hi"],
+        "total": total,
+    })
+
+
 @router.get("/products")
 async def list_products(request: Request, user_id: int = Depends(require_auth)):
     query = request.query_params
     page = max(_int_or(query.get("page"), 1), 1)
     limit = min(max(_int_or(query.get("limit"), 20), 1), 100)
-    search = query.get("search", "")
-
-    where = (
-        "(ULOWER(name) LIKE ULOWER(?) OR ULOWER(brand) LIKE ULOWER(?) "
-        "OR ULOWER(category) LIKE ULOWER(?)) AND " + _IN_STOCK
-    )
-    pattern = "%" + search + "%"
-    args = (pattern, pattern, pattern)
+    order = _SORTS.get(query.get("sort", "default"), _SORTS["default"])
+    where, args = _where(_filters(query))
 
     total = conn.execute(
-        "SELECT COUNT(*) AS n FROM products WHERE " + where, args
+        "SELECT COUNT(*) AS n FROM (" + _CATALOG + where + ") c", args
     ).fetchone()["n"]
     rows = conn.execute(
-        "SELECT * FROM products WHERE " + where + " ORDER BY id LIMIT ? OFFSET ?",
-        args + (limit, (page - 1) * limit),
+        _CATALOG + where + " ORDER BY " + order + " LIMIT ? OFFSET ?",
+        args + [limit, (page - 1) * limit],
     ).fetchall()
 
     return json_response(
@@ -156,6 +270,14 @@ async def get_product(product_id: str, user_id: int = Depends(require_auth)):
     if row is None:
         raise not_found("Product not found")
     return json_response(catalog.product_to_json(row))
+
+
+@router.get("/products/{product_id}/images")
+def get_product_images(product_id: str, user_id: int = Depends(require_auth)):
+    row = _find(product_id)
+    if row is None:
+        raise not_found("Product not found")
+    return json_response({"images": gallery.product_images(row["id"])})
 
 
 @router.put("/products/{product_id}")

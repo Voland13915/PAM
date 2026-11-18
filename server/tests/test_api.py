@@ -91,8 +91,38 @@ def test_old_database_is_migrated(tmp_path):
     )
 
     db = sqlite3.connect(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
     assert db.execute("SELECT name FROM users").fetchall() == [("Old user",)]
     columns = {r[1] for r in db.execute("PRAGMA table_info(products)")}
     assert "match_key" in columns and "offers" not in columns
     assert {r[0] for r in db.execute("SELECT code FROM stores")} == {"maximum", "ultra"}
+
+
+def test_version_2_database_gets_image_column_and_keeps_data(tmp_path):
+    db_file = tmp_path / "v2.db"
+    old = sqlite3.connect(db_file)
+    old.executescript(
+        "CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL, brand TEXT NOT NULL "
+        "DEFAULT '', category TEXT NOT NULL, specs TEXT NOT NULL DEFAULT '{}', match_key TEXT "
+        "UNIQUE, created_at TEXT NOT NULL);"
+        "CREATE TABLE offers (id INTEGER PRIMARY KEY, product_id INTEGER NOT NULL, store_id "
+        "INTEGER NOT NULL, external_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', url TEXT "
+        "NOT NULL DEFAULT '', price REAL NOT NULL, old_price REAL, in_stock INTEGER NOT NULL "
+        "DEFAULT 1, seen_at TEXT NOT NULL, UNIQUE (store_id, external_id));"
+        "INSERT INTO products VALUES (1, 'Phone', 'X', 'Смартфоны', '{}', NULL, '2026-11-18');"
+        "INSERT INTO offers VALUES (1, 1, 1, 'e1', 'Phone', '', 100, NULL, 1, '2026-11-18');"
+        "PRAGMA user_version = 2;"
+    )
+    old.close()
+
+    server_dir = Path(__file__).resolve().parent.parent
+    subprocess.run(
+        [sys.executable, "-c", "import app.main"],
+        cwd=server_dir, check=True,
+        env={**os.environ, "DB_PATH": str(db_file), "SEED_DEMO": "0"},
+    )
+
+    db = sqlite3.connect(db_file)
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert db.execute("SELECT name FROM products").fetchall() == [("Phone",)]
+    assert db.execute("SELECT image_url, details FROM offers").fetchall() == [("", "")]

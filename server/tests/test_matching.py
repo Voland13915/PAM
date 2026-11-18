@@ -69,7 +69,7 @@ def test_examples_of_keys():
         == "Ноутбуки|code|asus fa608umi"
     assert match_key("Ноутбуки", "Apple",
                      'Laptop Apple MacBook Air 13" M5 10c/10g 16/1TB Midnight MDHF4') \
-        == "Ноутбуки|macbook air 13 m5 10c/10g|16/1tb"
+        == "Ноутбуки|code|apple macbook air 13"
 
 
 def test_rematch_merges_products_and_moves_wishlist(client):
@@ -151,7 +151,7 @@ def test_ram_is_ignored_when_one_store_omits_it_and_kept_when_variants_differ():
     assert ids["ram-1"] == ids["ram-2"] == ids["ram-3"]
     assert ids["ram-4"] != ids["ram-5"]
     name = conn.execute("SELECT name FROM products WHERE id = ?", (ids["ram-1"],)).fetchone()[0]
-    assert name == "Samsung A366 Galaxy A36 5G 128GB"
+    assert name == "Samsung Galaxy A36 5G 6/128GB"
 
 
 def test_offers_are_one_per_store_with_lowest_price():
@@ -165,3 +165,15 @@ def test_offers_are_one_per_store_with_lowest_price():
 
     offers = catalog.offers_json(product)
     assert [(o["storeId"], o["price"]) for o in offers] == [(maximum, 900), (ultra, 950)]
+
+
+def test_product_image_comes_from_cheapest_offer_with_image():
+    maximum = catalog.get_or_create_store("maximum", "Maximum", "maximum.md")
+    ultra = catalog.get_or_create_store("ultra", "Ultra", "ultra.md")
+    product = catalog.create_product("Image phone", "Test", "Смартфоны")
+    catalog.upsert_offer(product, maximum, "img-1", 900)
+    catalog.upsert_offer(product, ultra, "img-2", 950, image_url="https://cdn.ultra.md/a.webp")
+    assert catalog.image_url(product) == "https://cdn.ultra.md/a.webp"
+
+    catalog.upsert_offer(product, ultra, "img-2", 940)
+    assert catalog.image_url(product) == "https://cdn.ultra.md/a.webp"

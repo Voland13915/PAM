@@ -3,7 +3,8 @@ from typing import Dict, Iterator, List, Optional
 
 from bs4 import BeautifulSoup
 
-from .base import Fetcher, PageNotFound, ParseError, ScrapedItem
+from ..matching import brand_from_title
+from .base import Fetcher, PageNotFound, ParseError, ScrapedItem, pick_image
 
 STORE = ("maximum", "Maximum", "maximum.md")
 BASE_URL = "https://maximum.md"
@@ -18,10 +19,11 @@ _TITLE = ".product__item__title a"
 _PRICE_CURRENT = ".product__item__price-current"
 _PRICE_OLD = ".product__item__price-old"
 _COUNTER = ".page__header__title__counter"
+_DESCRIPTION = ".product-item-description"
+_CODE = ".product-item-description-code"
 _OUT_OF_STOCK = re.compile(r"nu este [îi]n stoc", re.IGNORECASE)
 _AMOUNT = re.compile(r"(\d[\d\s ]*)\s*lei(?!\s*/)")
 _PRODUCT_ID = re.compile(r"/ro/(\d+)/?$")
-_TYPE_WORDS = {"smartphone", "laptop", "telefon", "notebook"}
 
 
 def _price(text: str) -> Optional[float]:
@@ -29,11 +31,28 @@ def _price(text: str) -> Optional[float]:
     return float(digits) if digits else None
 
 
-def _brand(title: str) -> str:
-    words = title.split()
-    if words and words[0].lower() in _TYPE_WORDS:
-        words = words[1:]
-    return words[0] if words else ""
+def _visible(node, card) -> bool:
+    for parent in node.parents:
+        classes = parent.get("class") or []
+        style = (parent.get("style") or "").replace(" ", "")
+        if "hidden" in classes or "display:none" in style:
+            return False
+        if parent is card:
+            return True
+    return True
+
+
+def _details(card) -> str:
+    description = card.select_one(_DESCRIPTION)
+    if description is None:
+        return ""
+    for code in description.select(_CODE):
+        code.extract()
+    return " ".join(description.get_text(" ").split())
+
+
+def _in_stock(card) -> bool:
+    return not any(_visible(text, card) for text in card.find_all(string=_OUT_OF_STOCK))
 
 
 def _page_url(path: str, page: int) -> str:
@@ -78,11 +97,13 @@ def parse_listing(html: str) -> List[ScrapedItem]:
         items.append(ScrapedItem(
             external_id=match.group(1),
             title=title,
-            brand=_brand(title),
+            brand=brand_from_title(title),
             price=price,
             old_price=old_price if old_price and old_price > price else None,
             url=href if href.startswith("http") else BASE_URL + href,
-            in_stock=not _OUT_OF_STOCK.search(card.get_text(" ")),
+            in_stock=_in_stock(card),
+            details=_details(card),
+            image_url=pick_image(card, BASE_URL),
         ))
     return items
 

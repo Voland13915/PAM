@@ -38,17 +38,15 @@ def save_items(
             if round(existing["price"], 2) != round(item.price, 2):
                 stats["price_changes"] += 1
         else:
-            base, key, _ = match_parts(category, item.brand, item.title)
+            base, _, _ = match_parts(category, item.brand, item.title)
             row = conn.execute(
-                "SELECT id FROM products WHERE match_key IN (?, ?) "
-                "ORDER BY match_key = ? DESC LIMIT 1",
-                (key, base, key),
+                "SELECT id FROM products WHERE match_key = ?", (base,)
             ).fetchone()
             if row is not None:
                 product_id = row["id"]
             else:
                 product_id = catalog.create_product(
-                    display_name(item.title), item.brand, category, match_key=key
+                    display_name(item.title), item.brand, category
                 )
                 stats["new_products"] += 1
             stats["new_offers"] += 1
@@ -56,7 +54,8 @@ def save_items(
         catalog.upsert_offer(
             product_id, store_id, item.external_id, item.price,
             old_price=item.old_price, in_stock=item.in_stock,
-            title=item.title, url=item.url, now=now,
+            title=item.title, url=item.url, image_url=item.image_url,
+            details=item.details, now=now,
         )
     return stats
 

@@ -39,7 +39,10 @@ class ProductCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ProductImage(category: product.category),
+                  ProductImage(
+                    category: product.category,
+                    imageUrl: product.imageUrl,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -58,27 +61,38 @@ class ProductCard extends StatelessWidget {
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              'от ${formatPrice(best.price)}',
-                              style: text.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: scheme.primary,
+                        if (product.isAvailable)
+                          Row(
+                            children: [
+                              Text(
+                                'от ${formatPrice(best.price)}',
+                                style: text.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.primary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'в $bestStoreName',
-                                overflow: TextOverflow.ellipsis,
-                                style: text.bodySmall,
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'в $bestStoreName',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.bodySmall,
+                                ),
                               ),
+                            ],
+                          )
+                        else
+                          Text(
+                            'Нет в наличии',
+                            style: text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: scheme.error,
                             ),
-                          ],
-                        ),
+                          ),
                         Text(
-                          'Цены в $count ${storesWord(count)}',
+                          product.isAvailable
+                              ? 'Цены в $count ${storesWord(count)}'
+                              : 'Последняя цена ${formatPrice(best.price)}',
                           style: text.bodySmall
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),

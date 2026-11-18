@@ -23,6 +23,22 @@ class PriceHistoryChart extends StatelessWidget {
           style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant));
     }
 
+    if (prices.every((p) => p == prices.first)) {
+      final since = dates.isNotEmpty ? ' с ${formatShortDate(dates.first)}' : '';
+      return Row(
+        children: [
+          Icon(Icons.trending_flat, color: scheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Цена не менялась$since: ${formatPrice(prices.first)}',
+              style: text.bodyMedium,
+            ),
+          ),
+        ],
+      );
+    }
+
     final minPrice = prices.reduce(min);
     final range = prices.reduce(max) - minPrice;
 
