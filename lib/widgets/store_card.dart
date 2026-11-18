@@ -24,7 +24,8 @@ class StoreCard extends StatelessWidget {
           child: Text(store.name[0]),
         ),
         title: Text(store.name, style: text.titleMedium),
-        subtitle: Text('${store.website}\nОбновлено ${store.lastSync}'),
+        subtitle: Text(
+            '${store.website}\nОбновлено: ${formatSyncTime(store.lastSync)}'),
         isThreeLine: true,
         trailing: Column(
           mainAxisSize: MainAxisSize.min,

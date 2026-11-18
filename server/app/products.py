@@ -1,26 +1,17 @@
-import json
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Request, Response
 
+from . import catalog
 from .auth import require_auth
-from .db import conn, now_iso
+from .db import conn
 from .errors import json_response, not_found, read_json_body, string_field, validation_error
 
 router = APIRouter()
 
-
-def _to_json(row) -> dict:
-    return {
-        "id": row["id"],
-        "name": row["name"],
-        "brand": row["brand"],
-        "category": row["category"],
-        "specs": json.loads(row["specs"]),
-        "offers": json.loads(row["offers"]),
-        "priceHistory": json.loads(row["price_history"]),
-        "createdAt": row["created_at"],
-    }
+_IN_STOCK = (
+    "EXISTS (SELECT 1 FROM offers o WHERE o.product_id = products.id AND o.in_stock = 1)"
+)
 
 
 def _find(id_param: str):
@@ -45,7 +36,6 @@ def _is_number(value: Any) -> bool:
 
 
 def _parse_body(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Validates a product body; raises 400 VALIDATION_ERROR on bad input."""
     name = string_field(body, "name")
     if name is None:
         raise validation_error("name is required")
@@ -74,6 +64,8 @@ def _parse_body(body: Dict[str, Any]) -> Dict[str, Any]:
         in_stock = offer.get("inStock", True)
         if not isinstance(store_id, int) or store_id not in store_ids:
             raise validation_error("offer.storeId must reference an existing store")
+        if any(o["storeId"] == store_id for o in offers):
+            raise validation_error("every offer must have a different storeId")
         if not _is_number(price) or price <= 0:
             raise validation_error("offer.price must be a positive number")
         if old_price is not None and (not _is_number(old_price) or old_price <= 0):
@@ -86,36 +78,42 @@ def _parse_body(body: Dict[str, Any]) -> Dict[str, Any]:
     if not any(o["inStock"] for o in offers):
         raise validation_error("at least one offer must be in stock")
 
-    history = body.get("priceHistory")
-    if history is None or history == []:
-        history = [min(o["price"] for o in offers if o["inStock"])]
-    if not isinstance(history, list) or not all(_is_number(p) and p > 0 for p in history):
-        raise validation_error("priceHistory must be an array of positive numbers")
+    return {"name": name, "brand": brand, "category": category,
+            "specs": specs, "offers": offers}
 
-    return {
-        "name": name,
-        "brand": brand,
-        "category": category,
-        "specs": json.dumps(specs, ensure_ascii=False),
-        "offers": json.dumps(offers, ensure_ascii=False),
-        "price_history": json.dumps(history),
+
+def _save_offers(product_id: int, offers: List[Dict[str, Any]]) -> None:
+    existing = {
+        r["store_id"]: r["external_id"]
+        for r in conn.execute(
+            "SELECT store_id, external_id FROM offers WHERE product_id = ?",
+            (product_id,),
+        ).fetchall()
     }
+    for o in offers:
+        external_id = existing.get(o["storeId"], "manual-%d" % product_id)
+        catalog.upsert_offer(
+            product_id, o["storeId"], external_id, o["price"],
+            old_price=o["oldPrice"], in_stock=o["inStock"],
+        )
+    keep = [o["storeId"] for o in offers]
+    conn.execute(
+        "DELETE FROM offers WHERE product_id = ? AND store_id NOT IN (%s)"
+        % ",".join("?" * len(keep)),
+        (product_id, *keep),
+    )
 
 
 @router.get("/products")
 async def list_products(request: Request, user_id: int = Depends(require_auth)):
-    """GET /products?page=1&limit=20&search=  -> {items, page, limit, total}
-
-    search matches name, brand or category, case-insensitively (Cyrillic too).
-    """
     query = request.query_params
     page = max(_int_or(query.get("page"), 1), 1)
     limit = min(max(_int_or(query.get("limit"), 20), 1), 100)
     search = query.get("search", "")
 
     where = (
-        "ULOWER(name) LIKE ULOWER(?) OR ULOWER(brand) LIKE ULOWER(?) "
-        "OR ULOWER(category) LIKE ULOWER(?)"
+        "(ULOWER(name) LIKE ULOWER(?) OR ULOWER(brand) LIKE ULOWER(?) "
+        "OR ULOWER(category) LIKE ULOWER(?)) AND " + _IN_STOCK
     )
     pattern = "%" + search + "%"
     args = (pattern, pattern, pattern)
@@ -130,7 +128,7 @@ async def list_products(request: Request, user_id: int = Depends(require_auth)):
 
     return json_response(
         {
-            "items": [_to_json(row) for row in rows],
+            "items": [catalog.product_to_json(row) for row in rows],
             "page": page,
             "limit": limit,
             "total": total,
@@ -140,37 +138,30 @@ async def list_products(request: Request, user_id: int = Depends(require_auth)):
 
 @router.post("/products")
 async def create_product(request: Request, user_id: int = Depends(require_auth)):
-    """POST /products  {name, brand, category, specs, offers, priceHistory} -> 201"""
     body = await read_json_body(request)
     if body is None:
         raise validation_error("Body must be a JSON object")
     fields = _parse_body(body)
-    cursor = conn.execute(
-        "INSERT INTO products (name, brand, category, specs, offers, price_history, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (
-            fields["name"], fields["brand"], fields["category"], fields["specs"],
-            fields["offers"], fields["price_history"], now_iso(),
-        ),
-    )
-    row = _find(str(cursor.lastrowid))
-    return json_response(_to_json(row), status=201)
+    with catalog.transaction():
+        product_id = catalog.create_product(
+            fields["name"], fields["brand"], fields["category"], fields["specs"]
+        )
+        _save_offers(product_id, fields["offers"])
+    return json_response(catalog.product_to_json(_find(str(product_id))), status=201)
 
 
 @router.get("/products/{product_id}")
 async def get_product(product_id: str, user_id: int = Depends(require_auth)):
-    """GET /products/{id} -> 200 product | 404"""
     row = _find(product_id)
     if row is None:
         raise not_found("Product not found")
-    return json_response(_to_json(row))
+    return json_response(catalog.product_to_json(row))
 
 
 @router.put("/products/{product_id}")
 async def update_product(
     product_id: str, request: Request, user_id: int = Depends(require_auth)
 ):
-    """PUT /products/{id}  {...same body as POST} -> 200 updated product | 404"""
     row = _find(product_id)
     if row is None:
         raise not_found("Product not found")
@@ -178,23 +169,18 @@ async def update_product(
     if body is None:
         raise validation_error("Body must be a JSON object")
     fields = _parse_body(body)
-    conn.execute(
-        "UPDATE products SET name = ?, brand = ?, category = ?, specs = ?, "
-        "offers = ?, price_history = ? WHERE id = ?",
-        (
-            fields["name"], fields["brand"], fields["category"], fields["specs"],
-            fields["offers"], fields["price_history"], row["id"],
-        ),
-    )
-    return json_response(_to_json(_find(str(row["id"]))))
+    with catalog.transaction():
+        catalog.update_product(
+            row["id"], fields["name"], fields["brand"], fields["category"], fields["specs"]
+        )
+        _save_offers(row["id"], fields["offers"])
+    return json_response(catalog.product_to_json(_find(str(row["id"]))))
 
 
 @router.delete("/products/{product_id}")
 async def delete_product(product_id: str, user_id: int = Depends(require_auth)):
-    """DELETE /products/{id} -> 204 | 404. Price alerts on it go too."""
     row = _find(product_id)
     if row is None:
         raise not_found("Product not found")
-    conn.execute("DELETE FROM wishlist WHERE product_id = ?", (row["id"],))
     conn.execute("DELETE FROM products WHERE id = ?", (row["id"],))
     return Response(status_code=204)

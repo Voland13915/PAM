@@ -4,12 +4,13 @@ import '../utils/formatters.dart';
 
 class PriceHistoryChart extends StatelessWidget {
   final List<double> prices;
-  final List<String> labels;
+
+  final List<DateTime> dates;
 
   const PriceHistoryChart({
     super.key,
     required this.prices,
-    this.labels = const ['апр', 'май', 'июн', 'июл', 'авг', 'сен'],
+    this.dates = const [],
   });
 
   @override
@@ -17,11 +18,16 @@ class PriceHistoryChart extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
+    if (prices.isEmpty) {
+      return Text('История цены появится после следующего обновления',
+          style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant));
+    }
+
     final minPrice = prices.reduce(min);
     final range = prices.reduce(max) - minPrice;
 
     double barHeight(double price) =>
-        range == 0 ? 60 : 30 + 70 * (price - minPrice) / range;
+        range == 0 ? 55 : 30 + 60 * (price - minPrice) / range;
 
     return SizedBox(
       height: 150,
@@ -36,6 +42,7 @@ class PriceHistoryChart extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     FittedBox(
+                      fit: BoxFit.scaleDown,
                       child: Text(formatNumber(prices[i]),
                           style: text.labelSmall),
                     ),
@@ -51,10 +58,15 @@ class PriceHistoryChart extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      i < labels.length ? labels[i] : '',
-                      style: text.labelSmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        i < dates.length ? formatShortDate(dates[i]) : '',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: text.labelSmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
                     ),
                   ],
                 ),

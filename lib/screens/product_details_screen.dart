@@ -128,26 +128,32 @@ class ProductDetailsScreen extends StatelessWidget {
             ),
           ),
 
-          const SectionTitle('Минимальная цена за 6 месяцев'),
+          const SectionTitle('Изменения минимальной цены'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: PriceHistoryChart(prices: product.priceHistory),
-            ),
-          ),
-
-          const SectionTitle('Характеристики'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                children: [
-                  for (final spec in product.specs.entries)
-                    InfoRow(label: spec.key, value: spec.value),
-                ],
+              child: PriceHistoryChart(
+                prices: product.priceHistory,
+                dates: product.priceHistoryDates,
               ),
             ),
           ),
+
+          if (product.specs.isNotEmpty) ...[
+            const SectionTitle('Характеристики'),
+            Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  children: [
+                    for (final spec in product.specs.entries)
+                      InfoRow(label: spec.key, value: spec.value),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 24),
           Row(
@@ -166,7 +172,6 @@ class ProductDetailsScreen extends StatelessWidget {
               Expanded(
                 child: inList
                     ? FilledButton.tonalIcon(
-                        // read в callback-е: действие, а не подписка
                         onPressed: () {
                           context.read<ShoppingListModel>().remove(productId);
                           _snack(context, 'Убрано из списка покупок');

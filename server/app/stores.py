@@ -3,20 +3,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request
 
 from .auth import require_auth
+from .catalog import store_to_json
 from .db import conn
 from .errors import json_response, not_found
 
 router = APIRouter()
-
-
-def _to_json(row) -> dict:
-    return {
-        "id": row["id"],
-        "name": row["name"],
-        "website": row["website"],
-        "productsTracked": row["products_tracked"],
-        "lastSync": row["last_sync"],
-    }
 
 
 def _int_or(value: Optional[str], default: int) -> int:
@@ -34,7 +25,11 @@ async def list_stores(request: Request, user_id: int = Depends(require_auth)):
     limit = min(max(_int_or(query.get("limit"), 20), 1), 100)
     search = query.get("search", "")
 
-    where = "ULOWER(name) LIKE ULOWER(?) OR ULOWER(website) LIKE ULOWER(?)"
+    # Магазины без единого предложения (например, закрытый от парсеров) не показываем
+    where = (
+        "(ULOWER(name) LIKE ULOWER(?) OR ULOWER(website) LIKE ULOWER(?)) "
+        "AND EXISTS (SELECT 1 FROM offers o WHERE o.store_id = stores.id)"
+    )
     args = ("%" + search + "%", "%" + search + "%")
 
     total = conn.execute(
@@ -47,7 +42,7 @@ async def list_stores(request: Request, user_id: int = Depends(require_auth)):
 
     return json_response(
         {
-            "items": [_to_json(row) for row in rows],
+            "items": [store_to_json(row) for row in rows],
             "page": page,
             "limit": limit,
             "total": total,
@@ -65,4 +60,4 @@ async def get_store(store_id: str, user_id: int = Depends(require_auth)):
     row = conn.execute("SELECT * FROM stores WHERE id = ?", (sid,)).fetchone()
     if row is None:
         raise not_found("Store not found")
-    return json_response(_to_json(row))
+    return json_response(store_to_json(row))

@@ -1,23 +1,27 @@
-import json
+import os
+from datetime import datetime, timedelta, timezone
 
-from .db import conn, now_iso
+from . import catalog
+from .db import conn
 
-# (name, website, productsTracked, lastSync)
-_STORES = [
-    ("Bomba", "bomba.md", 1240, "12 мин назад"),
-    ("Maximum", "maximum.md", 1185, "15 мин назад"),
-    ("Darwin", "darwin.md", 860, "20 мин назад"),
-    ("Enter", "enter.online", 930, "25 мин назад"),
-    ("Smart", "smart.md", 715, "40 мин назад"),
-    ("Ultra", "ultra.md", 1020, "1 ч назад"),
+REAL_STORES = [
+    ("maximum", "Maximum", "maximum.md"),
+    ("ultra", "Ultra", "ultra.md"),
 ]
 
+_DEMO_STORES = [
+    ("bomba", "Bomba", "bomba.md"),
+    ("maximum", "Maximum", "maximum.md"),
+    ("darwin", "Darwin", "darwin.md"),
+    ("enter", "Enter", "enter.online"),
+    ("smart", "Smart", "smart.md"),
+    ("ultra", "Ultra", "ultra.md"),
+]
 
 def _o(store_id, price, old_price=None, in_stock=True):
     return {"storeId": store_id, "price": price, "oldPrice": old_price, "inStock": in_stock}
 
 
-# (name, brand, category, specs, offers, priceHistory)
 _PRODUCTS = [
     ("Samsung Galaxy A36 5G 8/256GB", "Samsung", "Смартфоны",
      {"Экран": '6.7", Super AMOLED, 120 Гц', "Процессор": "Snapdragon 6 Gen 3",
@@ -139,27 +143,38 @@ _PRODUCTS = [
 ]
 
 
-def seed_if_empty() -> None:
-    """Fills stores and products once, only when the tables are empty."""
-    now = now_iso()
-    if conn.execute("SELECT COUNT(*) AS n FROM stores").fetchone()["n"] == 0:
-        conn.executemany(
-            "INSERT INTO stores (name, website, products_tracked, last_sync, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            [s + (now,) for s in _STORES],
-        )
-    if conn.execute("SELECT COUNT(*) AS n FROM products").fetchone()["n"] == 0:
-        conn.executemany(
-            "INSERT INTO products (name, brand, category, specs, offers, price_history, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                (
-                    name, brand, category,
-                    json.dumps(specs, ensure_ascii=False),
-                    json.dumps(offers, ensure_ascii=False),
-                    json.dumps(history),
-                    now,
+def _demo_enabled() -> bool:
+    return os.environ.get("SEED_DEMO", "0") == "1"
+
+
+def _days_ago(days: int) -> str:
+    moment = datetime.now(timezone.utc).replace(
+        hour=9, minute=0, second=0, microsecond=0
+    ) - timedelta(days=days)
+    return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _seed_demo_catalog(store_ids: list) -> None:
+    for name, brand, category, specs, offers, history in _PRODUCTS:
+        product_id = catalog.create_product(name, brand, category, specs)
+        for offer in offers:
+            store_id = store_ids[offer["storeId"] - 1]
+            for k, point in enumerate(history):
+                catalog.upsert_offer(
+                    product_id, store_id, "demo-%d" % product_id,
+                    round(offer["price"] * point / history[-1]),
+                    old_price=offer["oldPrice"] if k == len(history) - 1 else None,
+                    in_stock=offer["inStock"],
+                    now=_days_ago(30 * (len(history) - 1 - k)),
                 )
-                for name, brand, category, specs, offers, history in _PRODUCTS
-            ],
-        )
+    for store_id in store_ids:
+        catalog.mark_store_synced(store_id)
+
+
+def seed_if_empty() -> None:
+    with catalog.transaction():
+        for store in REAL_STORES:
+            catalog.get_or_create_store(*store)
+        products = conn.execute("SELECT COUNT(*) AS n FROM products").fetchone()["n"]
+        if products == 0 and _demo_enabled():
+            _seed_demo_catalog([catalog.get_or_create_store(*s) for s in _DEMO_STORES])

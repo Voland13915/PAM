@@ -5,3 +5,5 @@ fastapi==0.115.12
 uvicorn==0.30.6
 PyJWT==2.9.0
 bcrypt==4.2.1
+httpx==0.28.1  # загрузка страниц магазинов (app/scrapers)
+beautifulsoup4==4.12.3  # разбор HTML страниц магазинов

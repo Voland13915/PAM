@@ -6,13 +6,17 @@ class Offer {
   final double? oldPrice;
   final bool inStock;
 
-  const Offer(this.storeId, this.price, {this.oldPrice, this.inStock = true});
+  final String url;
+
+  const Offer(this.storeId, this.price,
+      {this.oldPrice, this.inStock = true, this.url = ''});
 
   factory Offer.fromJson(Map<String, dynamic> j) => Offer(
         j['storeId'] as int,
         (j['price'] as num).toDouble(),
         oldPrice: (j['oldPrice'] as num?)?.toDouble(),
         inStock: j['inStock'] as bool? ?? true,
+        url: j['url'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +36,8 @@ class Product {
   final List<Offer> offers;
   final List<double> priceHistory;
 
+  final List<DateTime> priceHistoryDates;
+
   const Product({
     required this.id,
     required this.name,
@@ -40,6 +46,7 @@ class Product {
     required this.specs,
     required this.offers,
     required this.priceHistory,
+    this.priceHistoryDates = const [],
   });
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -54,6 +61,9 @@ class Product {
             .toList(),
         priceHistory: (j['priceHistory'] as List? ?? const [])
             .map((e) => (e as num).toDouble())
+            .toList(),
+        priceHistoryDates: (j['priceHistoryDates'] as List? ?? const [])
+            .map((e) => DateTime.parse(e as String))
             .toList(),
       );
 
@@ -74,14 +84,18 @@ class Product {
         specs: specs,
         offers: offers,
         priceHistory: priceHistory,
+        priceHistoryDates: priceHistoryDates,
       );
 
   List<Offer> get inStockOffers => offers.where((o) => o.inStock).toList();
 
-  Offer get bestOffer =>
-      inStockOffers.reduce((a, b) => a.price <= b.price ? a : b);
+  bool get isAvailable => inStockOffers.isNotEmpty;
 
-  double get maxPrice => inStockOffers.map((o) => o.price).reduce(max);
+  List<Offer> get _priced => isAvailable ? inStockOffers : offers;
+
+  Offer get bestOffer => _priced.reduce((a, b) => a.price <= b.price ? a : b);
+
+  double get maxPrice => _priced.map((o) => o.price).reduce(max);
 
   double get priceSpread => maxPrice - bestOffer.price;
 }
