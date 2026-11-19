@@ -4,8 +4,8 @@ from typing import List, Optional, Tuple
 from .specs import Specs, size_label
 
 _PREFIX = re.compile(
-    r"^\s*(смартфон|smartphone|мобильный телефон|telefon mobil|игровой ноутбук|"
-    r"ноутбук|ультрабук|laptop|notebook)\s+",
+    r"^\s*(смартфон|smartphone|мобильный телефон|телефон|telefon mobil|игровой ноутбук|workstation|"
+    r"ноутбук(?:\s+игровой)?|ультрабук|(?:laptop|notebook)(?:\s+(?:gaming|business))?)\s+",
     re.IGNORECASE,
 )
 _REFURBISHED = re.compile(r"\{\s*ref|\{\s*grade|refurb|восстановлен", re.IGNORECASE)
@@ -13,11 +13,12 @@ _BRACKETS = re.compile(r"\{[^}]*\}|\[[^\]]*\]")
 _PART_NUMBER = re.compile(r"\(([A-Za-z0-9][A-Za-z0-9.\-#/]{5,})\)")
 _MEMORY = re.compile(r"^(?:(\d{1,2})/)?(\d{1,4})(gb|tb)$|^(\d{1,2})/(\d{2,4})$")
 _SAMSUNG_CODE = re.compile(r"^[a-z]\d{3}[a-z]?$")
+_SAMSUNG_SM = re.compile(r"^sm-?[a-z]\d{3}[a-z0-9/]*$")
 _CYRILLIC = re.compile(r"[а-яё]")
 
 _DROP = {
     "xiaomi", "apple", "samsung", "5g", "4g", "lte", "nfc", "dual", "sim", "ds", "eu",
-    "z", "moto",
+    "z", "zte",
 }
 PROTECTED = {
     "pro", "max", "plus", "ultra", "fe", "fs", "f", "lite", "mini", "power", "fusion",
@@ -48,6 +49,7 @@ _BRANDS = {
     "ulefone": "Ulefone", "doogee": "Doogee", "fossibot": "FOSSiBOT", "cubot": "Cubot",
     "energizer": "Energizer", "prestigio": "Prestigio", "razer": "Razer", "gateway": "Gateway",
     "chuwi": "Chuwi", "machenike": "Machenike", "thunderobot": "Thunderobot",
+    "iphone": "Apple", "ipad": "Apple", "macbook": "Apple", "galaxy": "Samsung",
 }
 
 
@@ -64,7 +66,8 @@ def brand_from_title(title: str) -> str:
         word = token.strip(",.;:()\"'")
         if not word or _CYRILLIC.search(word.lower()) or not re.fullmatch(r"[A-Za-z][A-Za-z\-]*", word):
             continue
-        if word.lower() in ("smartphone", "laptop", "notebook", "telefon", "mobil"):
+        if word.lower() in ("smartphone", "laptop", "notebook", "telefon", "mobil", "gaming",
+                            "business", "workstation", "ultrabook", "consumer", "smb"):
             continue
         return canonical_brand(word)
     return ""
@@ -92,6 +95,7 @@ def _normalize(title: str) -> str:
     text = text.replace("гб", "gb").replace("тб", "tb")
     text = re.sub(r"\s*/\s*", "/", text)
     text = re.sub(r"(\d)\s+(gb|tb)\b", r"\1\2", text)
+    text = re.sub(r"\b(\d{1,2})gb/(\d)", r"\1/\2", text)
     text = re.sub(r"\+", " plus ", text)
     text = re.sub(r"\b(flip|fold|xcover)(\d)", r"\1 \2", text)
     text = re.sub(r"(\d)(pro|plus|fe|fs|ultra|lite|max|mini|power)\b", r"\1 \2", text)
@@ -115,8 +119,18 @@ def _memory(token: str) -> Optional[Tuple[Optional[int], int]]:
     return (int(ram) if ram else None), storage
 
 
+def _memory_word(word: str) -> str:
+    lower = word.lower().replace("гб", "gb").replace("тб", "tb").strip(",")
+    return re.sub(r"^(\d{1,2})gb/(\d)", r"\1/\2", lower)
+
+
 def _storage(gb: int) -> str:
     return "%dtb" % (gb // 1024) if gb >= 1024 and gb % 1024 == 0 else "%dgb" % gb
+
+
+_LOOKALIKES = str.maketrans("асеорхук", "aceopxyk")
+_LOOKALIKE_TOKEN = re.compile(r"^(?=.*[a-z0-9])[a-z0-9асеорхук]+$")
+_POCO_MODEL = re.compile(r"[cfmx]\d+[a-z]*")
 
 
 def model_and_memory(title: str, brand: str = "") -> Tuple[List[str], Optional[Tuple[Optional[int], int]]]:
@@ -130,21 +144,29 @@ def model_and_memory(title: str, brand: str = "") -> Tuple[List[str], Optional[T
             break
         model.append(token)
     samsung = brand.lower() == "samsung" or "galaxy" in model
+    model = [_LOOKALIKE_TOKEN.sub(lambda m: m.group(0).translate(_LOOKALIKES), t) for t in model]
+    model = ["motorola" if t == "moto" else t for t in model]
+    model = [t for i, t in enumerate(model) if i == 0 or t != model[i - 1]]
+    if "honor" in model:
+        model = [t for t in model if t != "huawei"]
     model = [
         t for t in model
         if not _CYRILLIC.search(t)
         and t not in _DROP
         and t not in _COLORS
         and t.strip('"\'') != ""
+        and not _SAMSUNG_SM.match(t)
         and not (samsung and _SAMSUNG_CODE.match(t))
     ]
     if samsung and model and model[0] != "galaxy":
         model = ["galaxy"] + [t for t in model if t != "galaxy"]
+    if canonical_brand(brand) == "Xiaomi" and model and _POCO_MODEL.fullmatch(model[0]):
+        model = ["poco"] + model
     return model, memory
 
 
 _LAPTOP_CODE = re.compile(r"^(?=.*\d)(?=.*[a-z])[a-z0-9][a-z0-9\-_.]{4,}$")
-_CODE_ONLY_BRANDS = {"asus", "dell"}
+_CODE_ONLY_BRANDS = {"asus", "dell", "acer"}
 
 
 _DELL_SERIES = {"latitude", "vostro", "inspiron", "precision", "xps"}
@@ -166,7 +188,8 @@ def _mac_model(tokens: List[str]) -> Optional[str]:
         return None
     rest = tokens[tokens.index("macbook") + 1:]
     kind = rest[0] if rest and rest[0] in _MAC_KINDS else ""
-    size = next((t for t in rest[:4] if re.fullmatch(r"1[3-8]", t)), "")
+    size = next((t.split(".")[0].split(",")[0] for t in rest[:4]
+                 if re.fullmatch(r"1[3-8](?:[.,]\d)?", t)), "")
     return " ".join(p for p in ("apple macbook", kind, size) if p)
 
 
@@ -178,7 +201,9 @@ def laptop_code(title: str, brand: str) -> Optional[str]:
 
     for index, token in enumerate(tokens[:-1]):
         if brand_l == "dell" and token in _DELL_SERIES and tokens[index + 1].isdigit():
-            return "dell %s %s" % (token, tokens[index + 1])
+            following = [t for t in tokens[index + 1:index + 3] if t.isdigit()]
+            number = next((t for t in following if len(t) >= 4), following[0])
+            return "dell %s %s" % (token, number)
 
     if brand_l in _GEN_BRANDS:
         start = tokens.index(brand_l) + 1 if brand_l in tokens else 0
@@ -198,6 +223,8 @@ def laptop_code(title: str, brand: str) -> Optional[str]:
         code = token
         if brand_l == "asus":
             code = code.split("-")[0]
+        elif brand_l == "acer":
+            code = "-".join(code.split("-")[:2])
         code = code.split("_")[0]
         if len(code) < 5:
             continue
@@ -267,13 +294,13 @@ def display_name(title: str) -> str:
     samsung = any(w.lower() in ("samsung", "galaxy") for w in words)
     kept: List[str] = []
     for word in words:
-        lower = word.lower().replace("гб", "gb").replace("тб", "tb")
+        lower = _memory_word(word)
         if _memory(lower) is not None:
-            kept.append(word)
+            kept.append(lower.upper() if re.search(r"[a-z]", lower) else word.strip(","))
             break
         if _CYRILLIC.search(lower) or lower.strip(",") in _COLORS:
             continue
-        if samsung and _SAMSUNG_CODE.match(lower):
+        if (samsung and _SAMSUNG_CODE.match(lower)) or _SAMSUNG_SM.match(lower):
             continue
         kept.append(word)
     name = " ".join(kept).strip(" ,")
@@ -286,9 +313,16 @@ _CONFIG_TOKEN = re.compile(r"^\d+(gb|tb|гб|тб)?/\d+|^\d+c/\d+g$|^\d+(gb|tb|�
 _CPU_START = {"intel", "amd", "qualcomm", "ryzen"}
 
 
+_NAME_END = re.compile(r"\s-\s|\s/|/(?=[a-z])|\b(?:wuxga|fhd|full\s*hd|qhd|procesor|cu)\b", re.IGNORECASE)
+_NAME_INCH = re.compile(r"(?<![\w.,])\d{2}(?:[.,]\d{1,2})?\s*(?:''|\"|”|″)|(?<![\w.,])1[0-8][.,]\d(?![\w.,])")
+
+
 def _laptop_base_name(title: str) -> str:
     text = re.sub(r"\([^)]*\)", " ", _BRACKETS.sub(" ", clean_title(title)))
-    text = re.sub(r"[\"”″]", " ", text).replace(",", " ")
+    text = _NAME_END.split(text, 1)[0]
+    if "macbook" not in text.lower():
+        text = _NAME_INCH.sub(" ", text)
+    text = re.sub(r"[\"”″]|''", " ", text).replace(",", " ")
     kept: List[str] = []
     for word in text.split():
         lower = word.lower()
@@ -327,7 +361,7 @@ def _phone_name(name: str, specs: Specs) -> str:
 
 
 def _memory_before_colour(title: str) -> bool:
-    words = [w.lower().replace("гб", "gb").replace("тб", "tb") for w in
+    words = [_memory_word(w) for w in
              re.sub(r"(\d)\s+(gb|tb|гб|тб)\b", r"\1\2", _BRACKETS.sub(" ", title),
                     flags=re.IGNORECASE).split()]
     positions = [i for i, w in enumerate(words) if _memory(w) is not None]
@@ -338,8 +372,12 @@ def product_name(category: str, titles: List[str], specs: Specs) -> str:
     if category != "Ноутбуки":
         preferred = [t for t in titles if _memory_before_colour(t)]
         return _phone_name(display_name((preferred or titles)[0]), specs)
-    names = [_laptop_base_name(t) for t in titles]
-    name = max(names, key=lambda n: len(n.split())) or display_name(titles[0])
+    names = [n for n in (_laptop_base_name(t) for t in titles) if n]
+    votes: dict = {}
+    for n in names:
+        votes.setdefault(n.lower(), []).append(n)
+    best = max(votes.values(), key=lambda v: (len(v), len(v[0].split()))) if votes else []
+    name = best[0] if best else display_name(titles[0])
     config = []
     if specs.display.get("Процессор"):
         cpu = _cpu_label(specs.display["Процессор"])

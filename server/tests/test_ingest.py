@@ -5,6 +5,7 @@ import httpx
 from app import catalog, ingest, scrape
 from app.rematch import rematch
 from app.db import conn
+from app.scrapers import AUTOMATIC, SCRAPERS
 from app.scrapers.base import Fetcher, ScrapedItem
 
 PAGE = (Path(__file__).parent / "fixtures" / "bomba_page1.html").read_text(encoding="utf-8")
@@ -107,8 +108,7 @@ def test_cli_run_replaces_demo_catalog(monkeypatch, capsys):
         "SELECT COUNT(*) AS n FROM offers WHERE external_id LIKE 'demo-%'"
     ).fetchone()["n"] == 0
     codes = {r["code"] for r in conn.execute("SELECT code FROM stores")}
-    assert {"darwin", "enter", "smart"}.isdisjoint(codes)
-    assert {"bomba", "maximum"} <= codes
+    assert set(AUTOMATIC) | {"bomba"} <= codes
 
     a36 = _offer(catalog.get_or_create_store("bomba", "Bomba", "bomba.md"), "1102917")
     assert a36["price"] == 6999 and a36["old_price"] == 7499
@@ -122,6 +122,9 @@ def test_cli_all_runs_every_automatic_store(monkeypatch, capsys):
         "maximum.md": (fixtures / "maximum_page1.html").read_text(encoding="utf-8"),
         "ultra.md": (fixtures / "ultra_page1.html").read_text(encoding="utf-8"),
     }
+    for code in ("smart", "cactus", "xstore", "darwin", "enter", "pandashop"):
+        host = SCRAPERS[code].BASE_URL.split("//")[1]
+        pages[host] = (fixtures / ("%s_phones.html" % code)).read_text(encoding="utf-8")
 
     def fetcher(*args, **kwargs):
         def handler(request):
@@ -135,7 +138,9 @@ def test_cli_all_runs_every_automatic_store(monkeypatch, capsys):
     assert scrape.main(["all", "--category", "Смартфоны", "--dry-run"]) == 0
 
     out = capsys.readouterr().out
-    assert "Maximum / Смартфоны" in out and "Ultra / Смартфоны" in out
+    for code in AUTOMATIC:
+        assert "%s / Смартфоны" % SCRAPERS[code].STORE[1] in out
+    assert "ОШИБКА" not in out
     assert "Bomba" not in out
 
 

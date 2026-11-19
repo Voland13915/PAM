@@ -13,3 +13,6 @@ pages/
 matching_report.txt
 offers.csv
 product_pages/
+
+# Журналы автосбора цен
+logs/

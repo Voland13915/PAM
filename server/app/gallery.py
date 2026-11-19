@@ -1,10 +1,12 @@
+import asyncio
 import json
 import logging
+import re
 import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -109,42 +111,94 @@ def _download(url: str) -> Optional[List[str]]:
     return images
 
 
-def product_images(product_id: int) -> List[str]:
+def _stores(product_id: int, color: str) -> List[Any]:
     rows = conn.execute(
         "SELECT id, store_id, url, image_url, images, images_fetched_at FROM offers "
-        "WHERE product_id = ? AND url != '' ORDER BY in_stock DESC, price",
-        (product_id,),
+        "WHERE product_id = ? AND url != '' AND (? = '' OR color = ?) "
+        "ORDER BY in_stock DESC, price",
+        (product_id, color, color),
     ).fetchall()
-
     per_store: Dict[int, Any] = {}
     for row in rows:
         per_store.setdefault(row["store_id"], row)
+    return list(per_store.values())
 
+
+def _stale(rows: List[Any]) -> List[Any]:
+    return [r for r in rows if not _fresh(r["images_fetched_at"], r["images"])]
+
+
+def _download_all(urls: List[str]) -> List[Optional[List[str]]]:
+    return [_download(url) for url in urls]
+
+
+_SIZE_PARAMS = {"w", "h", "width", "height", "size", "resize", "v"}
+_SIZE_PATH = re.compile(r"/thumbor/\d+x\d+/|/thumbs?/|[-_]\d{2,4}x\d{2,4}(?=\.\w+$)")
+MIN_GALLERY = 2
+
+
+def image_key(url: str) -> str:
+    parts = urlsplit(url.strip().lower())
+    query = sorted((k, v) for k, v in parse_qsl(parts.query) if k not in _SIZE_PARAMS)
+    path = _SIZE_PATH.sub("/", parts.path)
+    return "%s%s?%s" % (parts.netloc, path, query)
+
+
+def merge_galleries(galleries: List[List[str]]) -> List[str]:
+    galleries = [g for g in galleries if g]
+    if not galleries:
+        return []
+    main = max(galleries, key=len)
+    chosen = [main] + ([g for g in galleries if g is not main] if len(main) < MIN_GALLERY else [])
     result: List[str] = []
-    for row in per_store.values():
-        if _fresh(row["images_fetched_at"], row["images"]):
-            images = json.loads(row["images"] or "[]")
-        else:
-            images = _download(row["url"])
-            if images is None:
-                images = json.loads(row["images"] or "[]")
-            else:
-                conn.execute(
-                    "UPDATE offers SET images = ?, images_fetched_at = ? WHERE id = ?",
-                    (json.dumps(images), now_iso(), row["id"]),
-                )
-        for url in images or ([row["image_url"]] if row["image_url"] else []):
-            if url not in result:
+    seen = set()
+    for gallery in chosen:
+        for url in gallery:
+            key = image_key(url)
+            if key not in seen:
+                seen.add(key)
                 result.append(url)
+    return result[:MAX_IMAGES]
 
+
+def _collect(product_id: int, color: str, rows: List[Any],
+             downloaded: Dict[int, Optional[List[str]]]) -> List[str]:
+    galleries: List[List[str]] = []
+    for row in rows:
+        images = downloaded.get(row["id"])
+        if row["id"] in downloaded and images is not None:
+            conn.execute(
+                "UPDATE offers SET images = ?, images_fetched_at = ? WHERE id = ?",
+                (json.dumps(images), now_iso(), row["id"]),
+            )
+        else:
+            images = json.loads(row["images"] or "[]")
+        galleries.append(images or ([row["image_url"]] if row["image_url"] else []))
+
+    result = merge_galleries(galleries)
     if not result:
         fallback = conn.execute(
-            "SELECT image_url FROM offers WHERE product_id = ? AND image_url != '' LIMIT 1",
-            (product_id,),
+            "SELECT image_url FROM offers WHERE product_id = ? AND image_url != '' "
+            "ORDER BY (? != '' AND color = ?) DESC, in_stock DESC, price LIMIT 1",
+            (product_id, color, color),
         ).fetchone()
         if fallback is not None:
             result.append(fallback["image_url"])
-    return result[:MAX_IMAGES]
+    return result
+
+
+def product_images(product_id: int, color: str = "") -> List[str]:
+    rows = _stores(product_id, color)
+    stale = _stale(rows)
+    found = _download_all([r["url"] for r in stale])
+    return _collect(product_id, color, rows, {r["id"]: f for r, f in zip(stale, found)})
+
+
+async def product_images_async(product_id: int, color: str = "") -> List[str]:
+    rows = _stores(product_id, color)
+    stale = _stale(rows)
+    found = await asyncio.to_thread(_download_all, [r["url"] for r in stale]) if stale else []
+    return _collect(product_id, color, rows, {r["id"]: f for r, f in zip(stale, found)})
 
 
 def reset(product_id: Optional[int] = None) -> int:

@@ -1,4 +1,6 @@
+import asyncio
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -6,13 +8,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import auth, files, notes
-from . import products, stores, wishlist
+from . import products, scheduler, stores, sync, wishlist
 from .errors import ApiError, json_response
 from .seed import seed_if_empty
 
 seed_if_empty()
 
-app = FastAPI(title="PAM Backend Template", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(scheduler.runner.loop()) if scheduler.enabled() else None
+    if task is not None:
+        print("Автосбор цен включён: каждый день в %s" % scheduler.run_at().strftime("%H:%M"))
+    yield
+    if task is not None:
+        task.cancel()
+
+
+app = FastAPI(title="PAM Backend Template", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 
 @app.get("/health")
@@ -26,6 +39,7 @@ app.include_router(files.router)
 app.include_router(stores.router)
 app.include_router(products.router)
 app.include_router(wishlist.router)
+app.include_router(sync.router)
 
 app.add_middleware(
     CORSMiddleware,

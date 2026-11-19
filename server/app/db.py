@@ -1,13 +1,19 @@
 import os
 import sqlite3
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from typing import Iterator, Optional
 from pathlib import Path
+
+from .colors import color_of
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE_DIR / "app.db")))
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -59,6 +65,7 @@ CREATE TABLE IF NOT EXISTS offers (
   details     TEXT    NOT NULL DEFAULT '',
   images      TEXT    NOT NULL DEFAULT '',
   images_fetched_at TEXT NOT NULL DEFAULT '',
+  color       TEXT    NOT NULL DEFAULT '',
   seen_at     TEXT    NOT NULL,
   UNIQUE (store_id, external_id)
 );
@@ -126,12 +133,20 @@ def _migrate(db: sqlite3.Connection) -> None:
             db.execute(
                 "ALTER TABLE offers ADD COLUMN images_fetched_at TEXT NOT NULL DEFAULT ''"
             )
+        if "color" not in columns:
+            db.execute("ALTER TABLE offers ADD COLUMN color TEXT NOT NULL DEFAULT ''")
+            db.executemany(
+                "UPDATE offers SET color = ? WHERE id = ?",
+                [(color_of(title), offer_id)
+                 for offer_id, title in db.execute("SELECT id, title FROM offers")],
+            )
     db.execute("PRAGMA user_version = %d" % SCHEMA_VERSION)
 
 
-conn = sqlite3.connect(DB_PATH, check_same_thread=False, isolation_level=None)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False, isolation_level=None, timeout=15.0)
 conn.row_factory = sqlite3.Row
 conn.execute("PRAGMA foreign_keys = ON")
+conn.execute("PRAGMA journal_mode = WAL")
 _migrate(conn)
 conn.executescript(_SCHEMA)
 
@@ -139,6 +154,26 @@ conn.create_function(
     "ULOWER", 1, lambda s: s.lower() if isinstance(s, str) else s,
     deterministic=True,
 )
+
+_deadline = threading.local()
+
+
+def _over_time() -> int:
+    limit: Optional[float] = getattr(_deadline, "value", None)
+    return 1 if limit is not None and time.monotonic() > limit else 0
+
+
+conn.set_progress_handler(_over_time, 10000)
+
+
+@contextmanager
+def time_limit(seconds: float) -> Iterator[None]:
+    previous = getattr(_deadline, "value", None)
+    _deadline.value = time.monotonic() + seconds
+    try:
+        yield
+    finally:
+        _deadline.value = previous
 
 
 def now_iso():

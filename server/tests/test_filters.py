@@ -91,3 +91,22 @@ def test_unavailable_products_are_hidden_unless_asked(client, data):
                         params={"category": CATEGORY, "unavailable": 1}).json()
     assert facets["total"] == 5
     assert {s["id"]: s["count"] for s in facets["stores"]}[ultra] == 4
+
+
+def test_endless_query_is_interrupted_instead_of_hanging_the_server():
+    import sqlite3
+    import time
+
+    import pytest
+
+    from app.db import conn, time_limit
+
+    started = time.monotonic()
+    with pytest.raises(sqlite3.OperationalError, match="interrupt"):
+        with time_limit(0.2):
+            conn.execute(
+                "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n) "
+                "SELECT COUNT(*) FROM n"
+            ).fetchone()
+    assert time.monotonic() - started < 5
+    assert conn.execute("SELECT 1").fetchone()[0] == 1

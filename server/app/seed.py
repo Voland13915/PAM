@@ -3,11 +3,9 @@ from datetime import datetime, timedelta, timezone
 
 from . import catalog
 from .db import conn
+from .scrapers import AUTOMATIC, SCRAPERS
 
-REAL_STORES = [
-    ("maximum", "Maximum", "maximum.md"),
-    ("ultra", "Ultra", "ultra.md"),
-]
+REAL_STORES = [SCRAPERS[code].STORE for code in AUTOMATIC]
 
 _DEMO_STORES = [
     ("bomba", "Bomba", "bomba.md"),

@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+from .colors import color_info, color_of
 from .db import conn, now_iso
 
 HISTORY_DAYS = 180
@@ -76,13 +77,15 @@ def update_product(product_id: int, name: str, brand: str, category: str,
 
 def product_to_json(row) -> Dict[str, Any]:
     prices, dates = price_history(row["id"])
+    rows = _offer_rows(row["id"])
     return {
         "id": row["id"],
         "name": row["name"],
         "brand": row["brand"],
         "category": row["category"],
         "specs": json.loads(row["specs"]),
-        "offers": offers_json(row["id"]),
+        "offers": _best_per_store(rows),
+        "colors": colors_json(row["id"], rows),
         "priceHistory": prices,
         "priceHistoryDates": dates,
         "imageUrl": image_url(row["id"]),
@@ -115,10 +118,12 @@ def upsert_offer(
     url: str = "",
     image_url: str = "",
     details: str = "",
+    color: str = "",
     now: Optional[str] = None,
 ) -> int:
     now = now or now_iso()
     stock = 1 if in_stock else 0
+    color = color_of(color) or color_of(title)
     row = conn.execute(
         "SELECT id, price, in_stock FROM offers WHERE store_id = ? AND external_id = ?",
         (store_id, external_id),
@@ -127,10 +132,10 @@ def upsert_offer(
     if row is None:
         offer_id = conn.execute(
             "INSERT INTO offers (product_id, store_id, external_id, title, url, price, "
-            "old_price, in_stock, image_url, details, seen_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "old_price, in_stock, image_url, details, color, seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (product_id, store_id, external_id, title, url, price, old_price, stock,
-             image_url, details, now),
+             image_url, details, color, now),
         ).lastrowid
         changed = True
     else:
@@ -139,8 +144,8 @@ def upsert_offer(
         conn.execute(
             "UPDATE offers SET product_id = ?, title = ?, url = ?, price = ?, "
             "old_price = ?, in_stock = ?, image_url = COALESCE(NULLIF(?, ''), image_url), "
-            "details = COALESCE(NULLIF(?, ''), details), seen_at = ? WHERE id = ?",
-            (product_id, title, url, price, old_price, stock, image_url, details, now,
+            "details = COALESCE(NULLIF(?, ''), details), color = ?, seen_at = ? WHERE id = ?",
+            (product_id, title, url, price, old_price, stock, image_url, details, color, now,
              offer_id),
         )
 
@@ -167,12 +172,15 @@ def mark_out_of_stock(offer_id: int, now: Optional[str] = None) -> None:
     )
 
 
-def offers_json(product_id: int) -> List[Dict[str, Any]]:
-    rows = conn.execute(
-        "SELECT store_id, price, old_price, in_stock, url FROM offers "
+def _offer_rows(product_id: int) -> List[Any]:
+    return conn.execute(
+        "SELECT store_id, price, old_price, in_stock, url, image_url, color FROM offers "
         "WHERE product_id = ? ORDER BY in_stock DESC, price",
         (product_id,),
     ).fetchall()
+
+
+def _best_per_store(rows: List[Any]) -> List[Dict[str, Any]]:
     best: Dict[int, Any] = {}
     for r in rows:
         best.setdefault(r["store_id"], r)
@@ -186,6 +194,31 @@ def offers_json(product_id: int) -> List[Dict[str, Any]]:
         }
         for r in sorted(best.values(), key=lambda r: (not r["in_stock"], r["price"]))
     ]
+
+
+def offers_json(product_id: int) -> List[Dict[str, Any]]:
+    return _best_per_store(_offer_rows(product_id))
+
+
+def colors_json(product_id: int, rows: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+    rows = rows if rows is not None else _offer_rows(product_id)
+    groups: Dict[str, List[Any]] = {}
+    for r in rows:
+        if r["color"]:
+            groups.setdefault(r["color"], []).append(r)
+    result = []
+    for code, members in groups.items():
+        name, hexcolor = color_info(code)
+        image = next((m["image_url"] for m in members if m["image_url"]), "")
+        result.append({
+            "code": code,
+            "name": name,
+            "hex": hexcolor,
+            "imageUrl": image,
+            "offers": _best_per_store(members),
+        })
+    result.sort(key=lambda c: (not c["offers"][0]["inStock"], c["offers"][0]["price"]))
+    return result
 
 
 def _utc_today() -> date:

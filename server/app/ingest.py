@@ -3,20 +3,22 @@ from typing import Dict, Iterable
 from . import catalog
 from .db import conn
 from .matching import display_name, match_parts
+from .scrapers import AUTOMATIC
 from .scrapers.base import ScrapedItem
-
-DEMO_STORE_CODES = ("darwin", "enter", "smart")
-
 
 def remove_demo_catalog() -> int:
     ids = [r["product_id"] for r in conn.execute(
         "SELECT DISTINCT product_id FROM offers WHERE external_id LIKE 'demo-%'"
     ).fetchall()]
+    if not ids:
+        return 0
     with catalog.transaction():
         conn.executemany("DELETE FROM products WHERE id = ?", [(i,) for i in ids])
         conn.execute(
-            "DELETE FROM stores WHERE code IN (%s)" % ",".join("?" * len(DEMO_STORE_CODES)),
-            DEMO_STORE_CODES,
+            "DELETE FROM stores WHERE code NOT IN (%s) AND NOT EXISTS "
+            "(SELECT 1 FROM offers o WHERE o.store_id = stores.id)"
+            % ",".join("?" * len(AUTOMATIC)),
+            AUTOMATIC,
         )
     return len(ids)
 
@@ -55,7 +57,7 @@ def save_items(
             product_id, store_id, item.external_id, item.price,
             old_price=item.old_price, in_stock=item.in_stock,
             title=item.title, url=item.url, image_url=item.image_url,
-            details=item.details, now=now,
+            details=item.details, color=item.color, now=now,
         )
     return stats
 

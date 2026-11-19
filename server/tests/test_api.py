@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from app import catalog
+from app.scrapers import AUTOMATIC
 from app.seed import _PRODUCTS
 
 
@@ -91,11 +92,11 @@ def test_old_database_is_migrated(tmp_path):
     )
 
     db = sqlite3.connect(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 6
     assert db.execute("SELECT name FROM users").fetchall() == [("Old user",)]
     columns = {r[1] for r in db.execute("PRAGMA table_info(products)")}
     assert "match_key" in columns and "offers" not in columns
-    assert {r[0] for r in db.execute("SELECT code FROM stores")} == {"maximum", "ultra"}
+    assert {r[0] for r in db.execute("SELECT code FROM stores")} == set(AUTOMATIC)
 
 
 def test_version_2_database_gets_image_column_and_keeps_data(tmp_path):
@@ -110,7 +111,8 @@ def test_version_2_database_gets_image_column_and_keeps_data(tmp_path):
         "NOT NULL DEFAULT '', price REAL NOT NULL, old_price REAL, in_stock INTEGER NOT NULL "
         "DEFAULT 1, seen_at TEXT NOT NULL, UNIQUE (store_id, external_id));"
         "INSERT INTO products VALUES (1, 'Phone', 'X', 'Смартфоны', '{}', NULL, '2026-11-18');"
-        "INSERT INTO offers VALUES (1, 1, 1, 'e1', 'Phone', '', 100, NULL, 1, '2026-11-18');"
+        "INSERT INTO offers VALUES (1, 1, 1, 'e1', 'Phone 8/256GB Midnight Black', '', 100, NULL, 1, "
+        "'2026-11-18');"
         "PRAGMA user_version = 2;"
     )
     old.close()
@@ -123,6 +125,6 @@ def test_version_2_database_gets_image_column_and_keeps_data(tmp_path):
     )
 
     db = sqlite3.connect(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 6
     assert db.execute("SELECT name FROM products").fetchall() == [("Phone",)]
-    assert db.execute("SELECT image_url, details FROM offers").fetchall() == [("", "")]
+    assert db.execute("SELECT image_url, details, color FROM offers").fetchall() == [("", "", "black")]

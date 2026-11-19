@@ -70,7 +70,7 @@ def main(argv=None) -> int:
                         help="магазин или all — все, что собираются автоматически")
     parser.add_argument("--category", action="append",
                         help="категория (можно несколько раз); по умолчанию все")
-    parser.add_argument("--max-pages", type=int, default=60)
+    parser.add_argument("--max-pages", type=int, default=200)
     parser.add_argument("--delay", type=float, default=1.5,
                         help="пауза между запросами, секунд")
     parser.add_argument("--dry-run", action="store_true", help="не записывать в базу")

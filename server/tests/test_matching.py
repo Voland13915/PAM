@@ -64,7 +64,7 @@ def test_examples_of_keys():
     assert match_key("Смартфоны", "Apple", "Smartphone Apple iPhone 14 256GB Midnight {Ref.}") \
         == "Смартфоны|iphone 14|256gb|ref"
     assert match_key("Ноутбуки", "Acer", "Laptop Acer Aspire 3 A315-24PT-R288 (NX.JK5AA.001)") \
-        == "Ноутбуки|code|acer aspire 3 a315-24pt-r288"
+        == "Ноутбуки|code|acer a315-24pt"
     assert match_key("Ноутбуки", "ASUS", "Laptop ASUS FA608UMI-TU211 TUF Gaming") \
         == "Ноутбуки|code|asus fa608umi"
     assert match_key("Ноутбуки", "Apple",

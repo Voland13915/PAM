@@ -1,7 +1,8 @@
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Callable, Dict, Iterator, List, Optional
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -36,6 +37,7 @@ class ScrapedItem:
     in_stock: bool = True
     details: str = ""
     image_url: str = ""
+    color: str = ""
 
 
 _IMAGE_ATTRIBUTES = ("data-src", "data-lazy-src", "data-original", "data-srcset", "srcset", "src")
@@ -93,7 +95,7 @@ class Fetcher:
             self._robots[site] = parser
         return self._robots[site].can_fetch("TechPriceBot", url)
 
-    def get(self, url: str, params: Optional[dict] = None) -> str:
+    def get(self, url: str, params: Optional[dict] = None, fresh: bool = False) -> str:
         if self.check_robots and not self._allowed(url):
             raise AccessBlocked("robots.txt сайта запрещает загрузку %s" % url)
 
@@ -103,6 +105,8 @@ class Fetcher:
             if wait > 0:
                 time.sleep(wait)
             self._last = time.monotonic()
+            if fresh:
+                self._client.cookies.clear()
             try:
                 response = self._client.get(url, params=params)
             except httpx.TransportError as exc:
@@ -143,3 +147,61 @@ class Fetcher:
 
     def close(self) -> None:
         self._client.close()
+
+
+def amount(text: Optional[str]) -> Optional[float]:
+    if not text:
+        return None
+    digits = re.sub(r"[^\d]", "", str(text))
+    return float(digits) if digits else None
+
+
+def text_of(node, selector: Optional[str] = None) -> str:
+    element = node.select_one(selector) if selector else node
+    return " ".join(element.get_text(" ").split()) if element is not None else ""
+
+
+def absolute(url: str, base_url: str) -> str:
+    return urljoin(base_url + "/", url) if url else ""
+
+
+def crawl(
+    fetcher: "Fetcher",
+    page_url: Callable[[int], str],
+    parse: Callable[[str], List[ScrapedItem]],
+    max_pages: int,
+    fresh_session: bool = False,
+) -> Iterator[ScrapedItem]:
+    seen = set()
+    full_page = previous = 0
+    for page in range(1, max_pages + 1):
+        try:
+            html = fetcher.get(page_url(page), fresh=fresh_session)
+        except PageNotFound:
+            if page == 1:
+                raise
+            return
+        except (AccessBlocked, httpx.HTTPError) as exc:
+            if page == 1:
+                raise
+            if previous < full_page:
+                return
+            print("  внимание: страница %d недоступна (%s: %s), собрано только до неё"
+                  % (page, type(exc).__name__, exc))
+            return
+        try:
+            items = parse(html)
+        except ParseError:
+            if page == 1:
+                raise
+            return
+        fresh = [i for i in items if i.external_id not in seen]
+        if not fresh:
+            if page == 2:
+                print("  внимание: вторая страница повторяет первую — листание не сработало")
+            return
+        full_page = full_page or len(items)
+        previous = len(fresh)
+        for item in fresh:
+            seen.add(item.external_id)
+            yield item

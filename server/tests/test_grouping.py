@@ -97,3 +97,21 @@ def test_macbooks_match_by_chip_cores_memory_and_storage():
     rematch()
     assert _product("grp-14")["id"] == _product("grp-15")["id"]
     assert _product("grp-16")["id"] != _product("grp-14")["id"]
+
+
+def test_ambiguous_offers_with_different_configs_stay_apart():
+    from app.grouping import Entry, cluster
+    from app.specs import Specs
+
+    def entry(name, ram, storage, screen=None):
+        specs = Specs(ram=ram, storage=storage, screen=screen)
+        return Entry(name, "Ноутбуки|code|hp x", "Ноутбуки", specs, ("ram", "storage", "cpu", "screen"))
+
+    groups = cluster([
+        entry("14-16", 16, 512, 14.0), entry("16-16", 16, 512, 16.0),
+        entry("a", 16, 512), entry("b", 32, 512), entry("c", 32, 512),
+    ])
+    by_member = {m.item: key for key, members, _ in groups for m in members}
+    assert by_member["b"] == by_member["c"]
+    assert by_member["a"] != by_member["b"]
+    assert len({key for key, _, _ in groups}) == len(groups)

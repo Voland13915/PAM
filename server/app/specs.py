@@ -49,13 +49,24 @@ def _apple_cores(text: str) -> str:
     return " c%sg%s" % match.groups() if match else ""
 
 
+_SNAPDRAGON_CODE = re.compile(r"x1[a-z]?-\d{2}-\d{3}")
+
+
 def normalize_cpu(text: str) -> Optional[str]:
     text = text.lower()
+    snapdragon = _SNAPDRAGON_CODE.search(text) if "snapdragon" in text else None
+    if snapdragon:
+        return "snapdragon " + snapdragon.group(0).replace("-", " ")
     cores = _apple_cores(text)
     text = text.split(" with ")[0]
     text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"\b\d+\s*c(?:pu)?\s*/\s*\d+\s*g(?:pu)?\b", " ", text)
     text = re.sub(r"[®™,]", " ", text).replace("-", " ")
-    words = [w for w in text.split() if w not in _CPU_NOISE]
+    text = re.sub(r"\b(ultra|ryzen|core)(\d)", r"\1 \2", text)
+    words: list = []
+    for word in text.split():
+        if word not in _CPU_NOISE and (not words or words[-1] != word):
+            words.append(word)
     if not words:
         return None
     return " ".join(words) + cores
@@ -125,6 +136,8 @@ def _from_segments(details: str, category: str, specs: Specs) -> None:
         elif _CPU_WORDS.search(segment):
             specs.cpu = normalize_cpu(segment)
             specs.display["Процессор"] = segment
+        elif re.fullmatch(r"[a-z]?\d{2,5}[a-z]{0,3}\d?", segment, re.IGNORECASE) and specs.cpu is None:
+            specs.cpu = segment.lower()
 
     if category == "Ноутбуки" and len(sizes) >= 2:
         specs.ram, specs.storage = sizes[0], sizes[1]

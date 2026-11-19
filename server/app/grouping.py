@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -34,6 +35,20 @@ def comparable_fields(category: str, base: str, apple: bool) -> Tuple[str, ...]:
     return tuple(fields)
 
 
+_CORES = re.compile(r" c\d+g\d+$")
+
+
+def same_cpu(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if _CORES.search(a) and _CORES.search(b):
+        return False
+    short, full = sorted((_CORES.sub("", a), _CORES.sub("", b)), key=len)
+    if short == full:
+        return True
+    return " " not in short and bool(re.search(r"\d", short)) and full.split()[-1] == short
+
+
 def compatible(a: Specs, b: Specs, fields: Tuple[str, ...], category: str) -> bool:
     for name in fields:
         x, y = getattr(a, name), getattr(b, name)
@@ -41,6 +56,9 @@ def compatible(a: Specs, b: Specs, fields: Tuple[str, ...], category: str) -> bo
             continue
         if name == "screen":
             if abs(x - y) > SCREEN_TOLERANCE.get(category, 0.3):
+                return False
+        elif name == "cpu":
+            if not same_cpu(x, y):
                 return False
         elif x != y:
             return False
@@ -51,6 +69,9 @@ def _merge(target: Specs, source: Specs) -> None:
     for name in ("ram", "storage", "screen", "cpu"):
         if getattr(target, name) is None and getattr(source, name) is not None:
             setattr(target, name, getattr(source, name))
+    if target.cpu and source.cpu and not _CORES.search(target.cpu) and _CORES.search(source.cpu) \
+            and same_cpu(target.cpu, source.cpu):
+        target.cpu = source.cpu
     for label, value in source.display.items():
         target.display.setdefault(label, value)
 
@@ -100,9 +121,17 @@ def cluster(entries: List[Entry]) -> List[Tuple[str, List[Entry], Specs]]:
         else:
             used[signature] = 1
         result.append(("%s|%s" % (base, signature), c.members, c.specs))
-    if ambiguous:
-        specs = Specs(display={})
-        for entry in ambiguous:
-            _merge(specs, entry.specs)
-        result.append(("%s|?" % base, ambiguous, specs))
+    loose: List[Cluster] = []
+    for entry in ambiguous:
+        target = next((c for c in loose if compatible(c.specs, entry.specs, fields, category)), None)
+        if target is None:
+            target = Cluster(Specs(display={}))
+            loose.append(target)
+        target.members.append(entry)
+        _merge(target.specs, entry.specs)
+    for index, c in enumerate(loose):
+        key = "%s|?" % base if index == 0 else "%s|?|%s" % (base, _signature(c.specs, fields))
+        if index and any(k == key for k, _, _ in result):
+            key += ",%d" % index
+        result.append((key, c.members, c.specs))
     return result

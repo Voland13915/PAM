@@ -64,10 +64,9 @@ def test_gallery_is_downloaded_once_per_store_and_cached(requests):
     product = _product_with_offers("cache")
 
     images = gallery.product_images(product)
-    assert len(images) == gallery.MAX_IMAGES
+    assert len(images) == 10
     assert len(requests) == 2
-    assert images[0].startswith("https://i.simpalsmedia.com/thumbor/800x0/")
-    assert any(i.startswith("https://cdn-ultra.esempla.com/") for i in images)
+    assert all("ultra" in i for i in images)
 
     assert gallery.product_images(product) == images
     assert len(requests) == 2
@@ -83,7 +82,7 @@ def test_images_endpoint(client, requests):
     product = _product_with_offers("api")
     response = client.get("/products/%d/images" % product)
     assert response.status_code == 200
-    assert len(response.json()["images"]) == gallery.MAX_IMAGES
+    assert len(response.json()["images"]) == 10
     assert client.get("/products/999999/images").status_code == 404
 
 
@@ -94,3 +93,47 @@ def test_reset_clears_cached_images():
     conn.execute("UPDATE offers SET images = '[\"x\"]', images_fetched_at = '2026-01-01T00:00:00Z'")
     assert gallery.reset() > 0
     assert conn.execute("SELECT COUNT(*) FROM offers WHERE images_fetched_at != ''").fetchone()[0] == 0
+
+
+def test_async_gallery_downloads_off_the_main_thread(monkeypatch):
+    import asyncio
+    import threading
+
+    product = _product_with_offers("async")
+    main = threading.get_ident()
+    threads = []
+
+    def download(url):
+        threads.append(threading.get_ident())
+        return [url + "#photo"]
+
+    monkeypatch.setattr(gallery, "_download", download)
+    images = asyncio.run(gallery.product_images_async(product))
+    assert images[0] == "https://maximum.md/ro/6949091/#photo"
+    assert threads and main not in threads
+    assert gallery.product_images(product) == images
+    assert len(threads) == 2
+
+
+def test_gallery_comes_from_one_store_unless_it_is_too_small():
+    pandashop = ["https://cdn.pandashop.md/i/?i=/i/products/185/1854840.jpg&w=1220&h=1220",
+                 "https://cdn.pandashop.md/i/?i=/i/products/185/1854841.jpg&w=1220&h=1220"]
+    cactus = ["https://www.cactus.md/i.ashx?i=/i/products/31/155400.jpg"]
+    assert gallery.merge_galleries([cactus, pandashop]) == pandashop
+    assert gallery.merge_galleries([cactus, []]) == cactus
+    assert gallery.merge_galleries([["https://a/1.jpg"], ["https://b/1.jpg"]]) == \
+        ["https://a/1.jpg", "https://b/1.jpg"]
+    assert gallery.merge_galleries([]) == []
+
+
+def test_same_photo_in_another_size_is_a_duplicate():
+    same = [
+        "https://cdn.pandashop.md/i/?i=/i/products/185/1854840.jpg&w=1220&h=1220",
+        "https://cdn.pandashop.md/i/?i=/i/products/185/1854840.jpg&w=200&h=200",
+        "https://www.smart.md/image/cache/data/products/a/phone_1-335x335.webp",
+        "https://www.smart.md/image/cache/data/products/a/phone_1-800x800.webp",
+        "https://i.simpalsmedia.com/thumbor/800x0/i.simpalsmedia.com/x/1.jpg",
+        "https://i.simpalsmedia.com/thumbor/239x0/i.simpalsmedia.com/x/1.jpg",
+        "https://cdn.pandashop.md/i/?i=/i/products/185/1854841.jpg&w=1220",
+    ]
+    assert gallery.merge_galleries([same]) == [same[0], same[2], same[4], same[6]]

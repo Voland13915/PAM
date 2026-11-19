@@ -1,11 +1,14 @@
+import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Request, Response
 
 from . import catalog, gallery
 from .auth import require_auth
-from .db import conn
-from .errors import json_response, not_found, read_json_body, string_field, validation_error
+from .db import conn, time_limit
+from .errors import (
+    ApiError, json_response, not_found, read_json_body, string_field, validation_error,
+)
 
 router = APIRouter()
 
@@ -100,16 +103,26 @@ def _save_offers(product_id: int, offers: List[Dict[str, Any]]) -> None:
 
 
 _CATALOG = (
-    "SELECT * FROM (SELECT p.*, "
-    "COALESCE((SELECT MIN(o.price) FROM offers o WHERE o.product_id = p.id AND o.in_stock = 1), "
-    "(SELECT MIN(o.price) FROM offers o WHERE o.product_id = p.id)) AS best_price, "
-    "EXISTS (SELECT 1 FROM offers o WHERE o.product_id = p.id AND o.in_stock = 1) AS available, "
-    "(SELECT COUNT(DISTINCT o.store_id) FROM offers o WHERE o.product_id = p.id "
-    "AND o.in_stock = 1) AS stores, "
-    "(SELECT MAX((o.old_price - o.price) / o.old_price) FROM offers o "
-    "WHERE o.product_id = p.id AND o.in_stock = 1 AND o.old_price > o.price) AS discount "
-    "FROM products p) c WHERE c.best_price IS NOT NULL"
+    "SELECT * FROM (SELECT p.*, COALESCE(a.stock_min, a.any_min) AS best_price, "
+    "a.available AS available, a.stores AS stores, a.discount AS discount "
+    "FROM products p JOIN (SELECT product_id, "
+    "MIN(CASE WHEN in_stock = 1 THEN price END) AS stock_min, "
+    "MIN(price) AS any_min, "
+    "MAX(CASE WHEN in_stock = 1 THEN 1 ELSE 0 END) AS available, "
+    "COUNT(DISTINCT CASE WHEN in_stock = 1 THEN store_id END) AS stores, "
+    "MAX(CASE WHEN in_stock = 1 AND old_price > price "
+    "THEN (old_price - price) / old_price END) AS discount "
+    "FROM offers GROUP BY product_id) a ON a.product_id = p.id) c "
+    "WHERE c.best_price IS NOT NULL"
 )
+
+QUERY_SECONDS = 10.0
+
+
+def _too_slow() -> ApiError:
+    return ApiError(503, "QUERY_TIMEOUT",
+                    "Каталог отвечал слишком долго — попробуйте изменить фильтры")
+
 
 _SORTS = {
     "default": "c.available DESC, c.stores DESC, c.name COLLATE NOCASE",
@@ -182,7 +195,16 @@ def _where(f: Dict[str, Any], skip: tuple = ()) -> Tuple[str, List[Any]]:
 
 @router.get("/products/facets")
 async def product_facets(request: Request, user_id: int = Depends(require_auth)):
-    f = _filters(request.query_params)
+    try:
+        with time_limit(QUERY_SECONDS):
+            return _facets(_filters(request.query_params))
+    except sqlite3.OperationalError as exc:
+        if "interrupt" in str(exc):
+            raise _too_slow()
+        raise
+
+
+def _facets(f: Dict[str, Any]):
 
     where, args = _where(f, skip=("category",))
     categories = conn.execute(
@@ -226,7 +248,16 @@ async def product_facets(request: Request, user_id: int = Depends(require_auth))
 
 @router.get("/products")
 async def list_products(request: Request, user_id: int = Depends(require_auth)):
-    query = request.query_params
+    try:
+        with time_limit(QUERY_SECONDS):
+            return _list(request.query_params)
+    except sqlite3.OperationalError as exc:
+        if "interrupt" in str(exc):
+            raise _too_slow()
+        raise
+
+
+def _list(query):
     page = max(_int_or(query.get("page"), 1), 1)
     limit = min(max(_int_or(query.get("limit"), 20), 1), 100)
     order = _SORTS.get(query.get("sort", "default"), _SORTS["default"])
@@ -273,11 +304,13 @@ async def get_product(product_id: str, user_id: int = Depends(require_auth)):
 
 
 @router.get("/products/{product_id}/images")
-def get_product_images(product_id: str, user_id: int = Depends(require_auth)):
+async def get_product_images(product_id: str, color: str = "",
+                             user_id: int = Depends(require_auth)):
     row = _find(product_id)
     if row is None:
         raise not_found("Product not found")
-    return json_response({"images": gallery.product_images(row["id"])})
+    images = await gallery.product_images_async(row["id"], color.strip().lower())
+    return json_response({"images": images})
 
 
 @router.put("/products/{product_id}")

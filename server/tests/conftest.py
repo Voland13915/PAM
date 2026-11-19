@@ -7,6 +7,7 @@ from pathlib import Path
 _TMP = tempfile.mkdtemp(prefix="techprice-test-")
 os.environ["DB_PATH"] = str(Path(_TMP) / "test.db")
 os.environ.setdefault("SEED_DEMO", "1")
+os.environ["AUTO_SCRAPE"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
