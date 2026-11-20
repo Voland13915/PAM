@@ -52,9 +52,11 @@ class HttpProductRepository implements ProductRepository {
       _api.send('GET', '/products/$id', parse: _product);
 
   @override
-  Future<Result<List<String>>> fetchImages(int id) => _api.send(
+  Future<Result<List<String>>> fetchImages(int id, {String color = ''}) =>
+      _api.send(
         'GET',
         '/products/$id/images',
+        query: {if (color.isNotEmpty) 'color': color},
         timeout: const Duration(seconds: 25),
         parse: (json) => [
           for (final url in (json as Map<String, dynamic>)['images'] as List)

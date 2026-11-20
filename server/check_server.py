@@ -147,10 +147,10 @@ def main():
     print("Сервер: " + BASE)
 
     # ------------------------------------------------------------------
-    token_a = token_b = store_id = pid = tag = new_product = item = None
+    token_a = token_b = store_id = store_id2 = pid = tag = new_product = item = None
 
     def sec_1():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 1 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("GET", "/health")
@@ -181,7 +181,7 @@ def main():
         token_b = r.json["token"]
 
     def sec_2():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 2 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("GET", "/notes", token=token_a)
@@ -206,7 +206,7 @@ def main():
         check(r.status == 404, "после удаления \u2192 404")
 
     def sec_3():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 3 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         body, ctype = multipart([("file", "a.txt", "text/plain", b"hello")])
@@ -231,7 +231,7 @@ def main():
         check(r.status == 404, "несуществующий файл \u2192 404")
 
     def sec_4():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 4 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("GET", "/stores")
@@ -243,6 +243,8 @@ def main():
         check(all(k in store for k in ("id", "name", "website", "productsTracked", "lastSync")),
               "поля магазина: id, name, website, productsTracked, lastSync")
         store_id = store["id"]
+        check(len(r.json["items"]) >= 2, "в каталоге не меньше двух магазинов")
+        store_id2 = r.json["items"][1]["id"]
         r = call("GET", "/stores/%d" % store_id, token=token_a)
         check(r.status == 200 and r.json["id"] == store_id, "GET /stores/{id} \u2192 200")
         r = call("GET", "/stores/999999", token=token_a)
@@ -251,7 +253,7 @@ def main():
         check(r.status == 404, "нечисловой id \u2192 404")
 
     def sec_5():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 5 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("GET", "/products")
@@ -281,7 +283,7 @@ def main():
             "brand": "TestBrand",
             "category": "Тест-Категория" + stamp[-6:],
             "specs": {"Память": "8 ГБ"},
-            "offers": [{"storeId": store_id, "price": 999}, {"storeId": store_id, "price": 899, "oldPrice": 1099}],
+            "offers": [{"storeId": store_id, "price": 999}, {"storeId": store_id2, "price": 899, "oldPrice": 1099}],
         }
         r = call("POST", "/products", {"name": "x"}, token_a)
         check(r.status == 400 and error_code(r) == "VALIDATION_ERROR", "создание без category/offers \u2192 400")
@@ -293,11 +295,15 @@ def main():
         check(r.status == 400, "ни одного предложения в наличии \u2192 400")
         r = call("POST", "/products", dict(new_product, specs={"Память": 8}), token_a)
         check(r.status == 400, "specs не из строк \u2192 400")
+        r = call("POST", "/products", dict(new_product, offers=[{"storeId": store_id, "price": 10},
+                                                                {"storeId": store_id, "price": 9}]), token_a)
+        check(r.status == 400, "два предложения одного магазина \u2192 400")
         r = call("POST", "/products", new_product, token_a)
         check(r.status == 201 and r.json["id"] > 0, "создание \u2192 201, id выдал сервер")
         pid = r.json["id"]
         check(r.json["priceHistory"] == [899], "история цены по умолчанию = минимальная цена")
-        check(r.json["offers"][1]["oldPrice"] == 1099, "oldPrice сохраняется")
+        cheapest = next(o for o in r.json["offers"] if o["storeId"] == store_id2)
+        check(cheapest["price"] == 899 and cheapest["oldPrice"] == 1099, "oldPrice сохраняется")
         r = call("GET", "/products?search=" + urllib.parse.quote(tag.lower()), token=token_a)
         check(r.status == 200 and r.json["total"] == 1 and r.json["items"][0]["id"] == pid,
               "поиск по названию без учёта регистра (кириллица)")
@@ -319,7 +325,7 @@ def main():
         check(r.status == 400, "PUT с неверным телом \u2192 400")
 
     def sec_6():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 6 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("GET", "/wishlist")
@@ -362,7 +368,7 @@ def main():
         check(r.status == 404, "повторный DELETE \u2192 404")
 
     def sec_7():
-        nonlocal token_a, token_b, store_id, pid, tag, new_product, item
+        nonlocal token_a, token_b, store_id, store_id2, pid, tag, new_product, item
         if token_a is None and 7 > 1:
             raise RuntimeError("нет token-а: не прошла регистрация в первом разделе")
         r = call("POST", "/wishlist", item, token_a)

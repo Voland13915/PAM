@@ -49,6 +49,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   void _clearSearch() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _searchCtrl.clear();
     _search('');
     setState(() {});
@@ -93,6 +94,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
               textInputAction: TextInputAction.search,
               onChanged: _onSearchChanged,
               onSubmitted: _search,
+              onTapOutside: (_) =>
+                  FocusManager.instance.primaryFocus?.unfocus(),
               decoration: InputDecoration(
                 hintText: 'Модель, бренд или артикул',
                 prefixIcon: const Icon(Icons.search),
@@ -350,6 +353,7 @@ class _CatalogContent extends StatelessWidget {
         ),
         Expanded(
           child: ListView.builder(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             itemCount: products.length + (catalog.hasMore ? 1 : 0),
             itemBuilder: (context, index) {
@@ -360,7 +364,10 @@ class _CatalogContent extends StatelessWidget {
                 child: ProductCard(
                   key: ValueKey(product.id),
                   product: product,
-                  onTap: () => context.push('/catalog/${product.id}'),
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    context.push('/catalog/${product.id}');
+                  },
                 ),
               );
             },

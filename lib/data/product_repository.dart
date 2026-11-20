@@ -15,7 +15,7 @@ abstract class ProductRepository {
     CatalogFilter filter = const CatalogFilter(),
   });
   Future<Result<Product>> fetchById(int id);
-  Future<Result<List<String>>> fetchImages(int id);
+  Future<Result<List<String>>> fetchImages(int id, {String color = ''});
   Future<Result<Product>> create(Product product);
   Future<Result<Product>> update(Product product);
   Future<Result<void>> delete(int id);

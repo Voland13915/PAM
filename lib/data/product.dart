@@ -27,6 +27,34 @@ class Offer {
       };
 }
 
+class ProductColor {
+  final String code;
+  final String name;
+  final String hex;
+  final String imageUrl;
+  final List<Offer> offers;
+
+  const ProductColor({
+    required this.code,
+    required this.name,
+    this.hex = '',
+    this.imageUrl = '',
+    this.offers = const [],
+  });
+
+  factory ProductColor.fromJson(Map<String, dynamic> j) => ProductColor(
+        code: j['code'] as String,
+        name: j['name'] as String? ?? '',
+        hex: j['hex'] as String? ?? '',
+        imageUrl: j['imageUrl'] as String? ?? '',
+        offers: (j['offers'] as List? ?? const [])
+            .map((e) => Offer.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  bool get isAvailable => offers.any((o) => o.inStock);
+}
+
 class Product {
   final int id;
   final String name;
@@ -37,6 +65,7 @@ class Product {
   final List<double> priceHistory;
   final List<DateTime> priceHistoryDates;
   final String imageUrl;
+  final List<ProductColor> colors;
 
   const Product({
     required this.id,
@@ -48,6 +77,7 @@ class Product {
     required this.priceHistory,
     this.priceHistoryDates = const [],
     this.imageUrl = '',
+    this.colors = const [],
   });
 
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -67,6 +97,9 @@ class Product {
             .map((e) => DateTime.parse(e as String))
             .toList(),
         imageUrl: j['imageUrl'] as String? ?? '',
+        colors: (j['colors'] as List? ?? const [])
+            .map((e) => ProductColor.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -88,7 +121,39 @@ class Product {
         priceHistory: priceHistory,
         priceHistoryDates: priceHistoryDates,
         imageUrl: imageUrl,
+        colors: colors,
       );
+
+  Product forColor(ProductColor color) => Product(
+        id: id,
+        name: name,
+        brand: brand,
+        category: category,
+        specs: specs,
+        offers: color.offers.isEmpty ? offers : color.offers,
+        priceHistory: priceHistory,
+        priceHistoryDates: priceHistoryDates,
+        imageUrl: color.imageUrl.isEmpty ? imageUrl : color.imageUrl,
+        colors: colors,
+      );
+
+  ProductColor? colorByCode(String? code) {
+    for (final c in colors) {
+      if (c.code == code) return c;
+    }
+    return null;
+  }
+
+  ProductColor? get bestColor {
+    if (colors.isEmpty || offers.isEmpty) return null;
+    final best = bestOffer;
+    for (final c in colors) {
+      final match = c.offers
+          .any((o) => o.storeId == best.storeId && o.price == best.price);
+      if (match) return c;
+    }
+    return null;
+  }
 
   List<Offer> get inStockOffers => offers.where((o) => o.inStock).toList();
 

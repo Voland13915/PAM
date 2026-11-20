@@ -88,4 +88,16 @@ void main() {
     expect(await catalog.images(2), isEmpty);
     expect(repository.imageRequests, 3);
   });
+
+  test('Фото каждого цвета кэшируются отдельно', () async {
+    final repository = FakeProductRepository([product(1)])
+      ..images[1] = ['https://a/1.webp'];
+    final catalog = CatalogModel(repository, FakeStoreRepository());
+
+    await catalog.images(1, color: 'black');
+    await catalog.images(1, color: 'black');
+    await catalog.images(1, color: 'silver');
+    await catalog.images(1);
+    expect(repository.imageColors, ['black', 'silver', '']);
+  });
 }

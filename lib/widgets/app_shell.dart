@@ -24,7 +24,13 @@ class AppShell extends StatelessWidget {
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: navigationShell.goBranch,
+        onDestinationSelected: (index) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),

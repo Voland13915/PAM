@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/catalog_model.dart';
 import '../widgets/error_view.dart';
 import '../widgets/store_card.dart';
+import '../widgets/sync_card.dart';
 
 class StoresScreen extends StatelessWidget {
   const StoresScreen({super.key});
@@ -24,12 +25,14 @@ class StoresScreen extends StatelessWidget {
     } else {
       body = ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: stores.length,
+        itemCount: stores.length + 1,
         separatorBuilder: (context, index) => const SizedBox(height: 8),
-        itemBuilder: (context, index) => StoreCard(
-          key: ValueKey(stores[index].id),
-          store: stores[index],
-        ),
+        itemBuilder: (context, index) => index == 0
+            ? const SyncCard()
+            : StoreCard(
+                key: ValueKey(stores[index - 1].id),
+                store: stores[index - 1],
+              ),
       );
     }
 

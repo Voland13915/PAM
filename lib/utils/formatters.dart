@@ -19,9 +19,11 @@ const _months = [
   'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
 ];
 
+/// «12 ноя» — подпись точки на графике цены.
 String formatShortDate(DateTime date) =>
     '${date.day}$_nbsp${_months[date.month - 1]}';
 
+/// Время последнего обновления магазина: ISO-строка с сервера → «12 мин назад».
 String formatSyncTime(String iso, {DateTime? now}) {
   final time = DateTime.tryParse(iso);
   if (time == null) return 'ещё не обновлялся';
@@ -31,4 +33,16 @@ String formatSyncTime(String iso, {DateTime? now}) {
   if (diff.inDays < 1) return '${diff.inHours}$_nbspч назад';
   if (diff.inDays < 7) return '${diff.inDays}$_nbspдн назад';
   return formatShortDate(time.toLocal());
+}
+
+String formatNextRun(DateTime time, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final day = DateTime(time.year, time.month, time.day);
+  final clock = '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
+  final days = day.difference(today).inDays;
+  if (days == 0) return 'сегодня в $clock';
+  if (days == 1) return 'завтра в $clock';
+  return '${formatShortDate(time)} в $clock';
 }

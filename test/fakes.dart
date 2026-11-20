@@ -5,6 +5,7 @@ import 'package:tech_price/data/product_repository.dart';
 import 'package:tech_price/data/result.dart';
 import 'package:tech_price/data/store.dart';
 import 'package:tech_price/data/store_repository.dart';
+import 'package:tech_price/data/sync_status.dart';
 import 'package:tech_price/data/wishlist_item.dart';
 import 'package:tech_price/data/wishlist_repository.dart';
 
@@ -81,10 +82,12 @@ class FakeProductRepository implements ProductRepository {
 
   final Map<int, List<String>> images = {};
   int imageRequests = 0;
+  final List<String> imageColors = [];
 
   @override
-  Future<Result<List<String>>> fetchImages(int id) async {
+  Future<Result<List<String>>> fetchImages(int id, {String color = ''}) async {
     imageRequests++;
+    imageColors.add(color);
     if (fail) return const Err(failure);
     return Ok(images[id] ?? const []);
   }
@@ -102,6 +105,21 @@ class FakeProductRepository implements ProductRepository {
 
 class FakeStoreRepository implements StoreRepository {
   bool fail = false;
+  SyncStatus sync = const SyncStatus(enabled: true);
+  int syncStarts = 0;
+
+  @override
+  Future<Result<SyncStatus>> fetchSync() async =>
+      fail ? const Err(failure) : Ok(sync);
+
+  @override
+  Future<Result<SyncStatus>> startSync() async {
+    if (fail) return const Err(failure);
+    if (sync.running) return const Err('Цены уже обновляются');
+    syncStarts++;
+    sync = const SyncStatus(enabled: true, running: true);
+    return Ok(sync);
+  }
 
   @override
   Future<Result<List<Store>>> fetchAll() async => fail

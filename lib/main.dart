@@ -14,6 +14,7 @@ import 'models/session_model.dart';
 import 'models/shopping_list_model.dart';
 import 'models/wishlist_model.dart';
 import 'router.dart';
+import 'widgets/price_alerts_host.dart';
 
 const apiBase = String.fromEnvironment(
   'API_BASE',
@@ -55,7 +56,11 @@ Future<void> main() async {
           return session;
         }),
       ],
-      child: const MyApp(),
+      child: PriceAlertsHost(
+        apiBase: apiBase,
+        tokens: tokens,
+        child: const MyApp(),
+      ),
     ),
   );
 }

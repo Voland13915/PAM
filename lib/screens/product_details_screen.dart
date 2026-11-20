@@ -7,13 +7,14 @@ import '../models/catalog_model.dart';
 import '../models/shopping_list_model.dart';
 import '../models/wishlist_model.dart';
 import '../utils/formatters.dart';
+import '../widgets/color_picker.dart';
 import '../widgets/info_row.dart';
 import '../widgets/missing_product_view.dart';
 import '../widgets/price_history_chart.dart';
 import '../widgets/price_row.dart';
 import '../widgets/product_gallery.dart';
 
-class ProductDetailsScreen extends StatelessWidget {
+class ProductDetailsScreen extends StatefulWidget {
   final int productId;
   final String basePath;
 
@@ -22,6 +23,26 @@ class ProductDetailsScreen extends StatelessWidget {
     required this.productId,
     required this.basePath,
   });
+
+  @override
+  State<ProductDetailsScreen> createState() => _ProductDetailsScreenState();
+}
+
+class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
+  String? _color;
+  bool _colorChosen = false;
+
+  int get productId => widget.productId;
+  String get basePath => widget.basePath;
+
+  @override
+  void didUpdateWidget(ProductDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.productId != widget.productId) {
+      _color = null;
+      _colorChosen = false;
+    }
+  }
 
   void _snack(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -47,10 +68,16 @@ class ProductDetailsScreen extends StatelessWidget {
     final tracked =
         context.watch<WishlistModel>().byProduct(productId) != null;
 
-    final product = catalog.byId(productId);
-    if (product == null) {
+    final base = catalog.byId(productId);
+    if (base == null) {
       return const MissingProductView();
     }
+    if (!_colorChosen) {
+      _colorChosen = true;
+      _color = base.bestColor?.code;
+    }
+    final selected = base.colorByCode(_color);
+    final product = selected == null ? base : base.forColor(selected);
 
     final best = product.bestOffer;
     final offers = [...product.offers]
@@ -73,10 +100,11 @@ class ProductDetailsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           ProductGallery(
-            key: ValueKey(product.id),
+            key: ValueKey('${product.id}/${selected?.code ?? ''}'),
             productId: product.id,
             category: product.category,
             fallbackUrl: product.imageUrl,
+            color: selected?.code ?? '',
           ),
           const SizedBox(height: 16),
           Text(product.name, style: text.headlineSmall),
@@ -85,6 +113,14 @@ class ProductDetailsScreen extends StatelessWidget {
             product.category,
             style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
+          if (base.colors.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ProductColorPicker(
+              colors: base.colors,
+              selected: selected?.code,
+              onSelected: (code) => setState(() => _color = code),
+            ),
+          ],
           const SizedBox(height: 16),
 
           Card(
@@ -192,7 +228,6 @@ class ProductDetailsScreen extends StatelessWidget {
               Expanded(
                 child: inList
                     ? FilledButton.tonalIcon(
-                        // read в callback-е: действие, а не подписка
                         onPressed: () {
                           context.read<ShoppingListModel>().remove(productId);
                           _snack(context, 'Убрано из списка покупок');

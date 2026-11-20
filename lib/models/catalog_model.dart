@@ -7,6 +7,7 @@ import '../data/product_repository.dart';
 import '../data/result.dart';
 import '../data/store.dart';
 import '../data/store_repository.dart';
+import '../data/sync_status.dart';
 
 class CatalogModel extends ChangeNotifier {
   CatalogModel(this._productRepository, this._storeRepository);
@@ -31,7 +32,7 @@ class CatalogModel extends ChangeNotifier {
   int _generation = 0;
 
   final Map<int, Product> _known = {};
-  final Map<int, List<String>> _images = {};
+  final Map<String, List<String>> _images = {};
   final Set<int> _resolving = {};
   final Set<int> _missing = {};
 
@@ -68,17 +69,22 @@ class CatalogModel extends ChangeNotifier {
 
   String storeName(int id) => storeById(id)?.name ?? '—';
 
-  Future<List<String>> images(int productId) async {
-    final cached = _images[productId];
+  Future<List<String>> images(int productId, {String color = ''}) async {
+    final key = '$productId/$color';
+    final cached = _images[key];
     if (cached != null) return cached;
-    switch (await _productRepository.fetchImages(productId)) {
+    switch (await _productRepository.fetchImages(productId, color: color)) {
       case Ok(:final value):
-        _images[productId] = value;
+        _images[key] = value;
         return value;
       case Err():
         return const [];
     }
   }
+
+  Future<Result<SyncStatus>> syncStatus() => _storeRepository.fetchSync();
+
+  Future<Result<SyncStatus>> startSync() => _storeRepository.startSync();
 
   Future<void> applyFilter(CatalogFilter filter) {
     _filter = filter;

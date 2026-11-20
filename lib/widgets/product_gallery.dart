@@ -8,6 +8,7 @@ class ProductGallery extends StatefulWidget {
   final int productId;
   final String category;
   final String fallbackUrl;
+  final String color;
   final double height;
 
   const ProductGallery({
@@ -15,6 +16,7 @@ class ProductGallery extends StatefulWidget {
     required this.productId,
     required this.category,
     this.fallbackUrl = '',
+    this.color = '',
     this.height = 260,
   });
 
@@ -25,12 +27,15 @@ class ProductGallery extends StatefulWidget {
 class _ProductGalleryState extends State<ProductGallery> {
   late final Future<List<String>> _images;
   final _controller = PageController();
+  final Set<String> _failed = {};
   int _page = 0;
 
   @override
   void initState() {
     super.initState();
-    _images = context.read<CatalogModel>().images(widget.productId);
+    _images = context
+        .read<CatalogModel>()
+        .images(widget.productId, color: widget.color);
   }
 
   @override
@@ -39,10 +44,17 @@ class _ProductGalleryState extends State<ProductGallery> {
     super.dispose();
   }
 
+  void _markFailed(String url) {
+    if (_failed.contains(url)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _failed.add(url));
+    });
+  }
+
   void _openFullscreen(List<String> images, int index) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       fullscreenDialog: true,
-      builder: (_) => _FullscreenGallery(images: images, initialIndex: index),
+      builder: (_) => FullscreenGallery(images: images, initialIndex: index),
     ));
   }
 
@@ -64,8 +76,12 @@ class _ProductGalleryState extends State<ProductGallery> {
     return FutureBuilder<List<String>>(
       future: _images,
       builder: (context, snapshot) {
-        final images = snapshot.data ?? const <String>[];
+        final images = [
+          for (final url in snapshot.data ?? const <String>[])
+            if (!_failed.contains(url)) url,
+        ];
         if (images.isEmpty) return _placeholder();
+        final page = _page < images.length ? _page : images.length - 1;
 
         return Column(
           children: [
@@ -79,7 +95,7 @@ class _ProductGalleryState extends State<ProductGallery> {
                     PageView.builder(
                       controller: _controller,
                       itemCount: images.length,
-                      onPageChanged: (page) => setState(() => _page = page),
+                      onPageChanged: (value) => setState(() => _page = value),
                       itemBuilder: (context, index) => GestureDetector(
                         onTap: () => _openFullscreen(images, index),
                         child: Padding(
@@ -94,9 +110,10 @@ class _ProductGalleryState extends State<ProductGallery> {
                                         child: CircularProgressIndicator(
                                             strokeWidth: 2),
                                       ),
-                            errorBuilder: (context, error, stackTrace) =>
-                                Icon(ProductImage.iconFor(widget.category),
-                                    size: 64, color: scheme.primary),
+                            errorBuilder: (context, error, stackTrace) {
+                              _markFailed(images[index]);
+                              return const SizedBox.shrink();
+                            },
                           ),
                         ),
                       ),
@@ -113,7 +130,7 @@ class _ProductGalleryState extends State<ProductGallery> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            '${_page + 1} / ${images.length}',
+                            '${page + 1} / ${images.length}',
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 12),
                           ),
@@ -132,10 +149,10 @@ class _ProductGalleryState extends State<ProductGallery> {
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _page ? 16 : 6,
+                      width: i == page ? 16 : 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: i == _page
+                        color: i == page
                             ? scheme.primary
                             : scheme.outlineVariant,
                         borderRadius: BorderRadius.circular(3),
@@ -151,17 +168,21 @@ class _ProductGalleryState extends State<ProductGallery> {
   }
 }
 
-class _FullscreenGallery extends StatefulWidget {
+class FullscreenGallery extends StatefulWidget {
   final List<String> images;
   final int initialIndex;
 
-  const _FullscreenGallery({required this.images, required this.initialIndex});
+  const FullscreenGallery({
+    super.key,
+    required this.images,
+    required this.initialIndex,
+  });
 
   @override
-  State<_FullscreenGallery> createState() => _FullscreenGalleryState();
+  State<FullscreenGallery> createState() => _FullscreenGalleryState();
 }
 
-class _FullscreenGalleryState extends State<_FullscreenGallery> {
+class _FullscreenGalleryState extends State<FullscreenGallery> {
   late final PageController _controller =
       PageController(initialPage: widget.initialIndex);
   late int _page = widget.initialIndex;
@@ -174,6 +195,8 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -187,7 +210,25 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
         itemBuilder: (context, index) => InteractiveViewer(
           maxScale: 4,
           child: Center(
-            child: Image.network(widget.images[index], fit: BoxFit.contain),
+            child: Image.network(
+              widget.images[index],
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const CircularProgressIndicator(strokeWidth: 2),
+              errorBuilder: (context, error, stackTrace) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.broken_image_outlined,
+                      size: 64, color: scheme.outline),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Фото недоступно',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

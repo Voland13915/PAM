@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../data/product.dart';
 import '../models/catalog_model.dart';
 import '../utils/formatters.dart';
+import 'color_picker.dart';
 import 'product_image.dart';
 
 class ProductCard extends StatelessWidget {
@@ -60,6 +61,23 @@ class ProductCard extends StatelessWidget {
                           style: text.bodySmall
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
+                        if (product.colors.length > 1) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              for (final c in product.colors.take(6))
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: ColorSwatchDot(hex: c.hex, size: 12),
+                                ),
+                              if (product.colors.length > 6)
+                                Text(
+                                  '+${product.colors.length - 6}',
+                                  style: text.bodySmall,
+                                ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         if (product.isAvailable)
                           Row(
