@@ -24,6 +24,8 @@ class Cluster:
 
 
 def comparable_fields(category: str, base: str, apple: bool) -> Tuple[str, ...]:
+    if category == "Телевизоры":
+        return ()
     if category == "Ноутбуки":
         return ("ram", "storage", "cpu", "screen")
     model = base.split("|")[1] if base.count("|") >= 1 else base

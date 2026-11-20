@@ -13,6 +13,7 @@ BASE_URL = "https://www.smart.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/smartphone",
     "Ноутбуки": "/ru/laptopuri",
+    "Телевизоры": "/ru/televizoare",
 }
 
 _CARD = "div.category-product-card"
@@ -52,6 +53,8 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
         price, highest = min(prices), max(prices)
         if category == "Ноутбуки":
             title, details = laptop_model(raw_title), laptop_details(raw_title)
+        elif category == "Телевизоры":
+            title, details = raw_title, raw_title
         else:
             title, details = raw_title, ""
         image = card.select_one(".custom_product_image_default img")

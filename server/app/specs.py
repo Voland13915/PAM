@@ -13,7 +13,7 @@ _CPU_NOISE = {"intel", "amd", "apple", "qualcomm", "core", "processor", "process
 
 DISPLAY_ORDER = [
     "Процессор", "Оперативная память", "Накопитель", "Экран", "Матрица", "Частота экрана",
-    "Разрешение", "Видеокарта", "Видеопамять", "Камера", "Аккумулятор",
+    "Разрешение", "Smart-платформа", "Видеокарта", "Видеопамять", "Камера", "Аккумулятор",
 ]
 
 
@@ -77,7 +77,7 @@ def _number(text: str) -> Optional[float]:
     return float(match.group(0).replace(",", ".")) if match else None
 
 
-def _screen_label(inches: float) -> str:
+def screen_label(inches: float) -> str:
     return ('%.1f"' % inches).replace('.0"', '"')
 
 
@@ -145,7 +145,10 @@ def _from_segments(details: str, category: str, specs: Specs) -> None:
         specs.storage = sizes[0]
 
 
-def parse_specs(category: str, details: str, memory=None, title: str = "") -> Specs:
+def parse_specs(category: str, details: str, memory=None, title: str = "", brand: str = "") -> Specs:
+    if category == "Телевизоры":
+        from . import tv
+        return tv.parse_specs(title, details, brand)
     specs = Specs()
     details = (details or "").strip()
     if ": " in details and "|" not in details:
@@ -168,5 +171,5 @@ def parse_specs(category: str, details: str, memory=None, title: str = "") -> Sp
     if specs.storage is not None:
         specs.display["Накопитель"] = size_label(specs.storage)
     if specs.screen is not None:
-        specs.display["Экран"] = _screen_label(specs.screen)
+        specs.display["Экран"] = screen_label(specs.screen)
     return specs

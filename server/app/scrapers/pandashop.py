@@ -13,6 +13,7 @@ BASE_URL = "https://www.pandashop.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/catalog/electronics/telephones/mobile/",
     "Ноутбуки": "/ru/catalog/electronics/orgtech/notebooks/",
+    "Телевизоры": "/ru/catalog/electronics/tv/tv/",
 }
 
 _CARD = "div.card.js-itemsList-item"
@@ -123,6 +124,9 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
         properties = _properties(card)
         if category == "Ноутбуки":
             title, details = laptop_title(raw_title), laptop_details(raw_title, properties)
+        elif category == "Телевизоры":
+            title = raw_title
+            details = " / ".join("%s: %s" % pair for pair in properties.items())
         else:
             title, details = raw_title, phone_details(properties)
         image = card.select_one("meta[itemprop=image]")

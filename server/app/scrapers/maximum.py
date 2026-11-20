@@ -12,6 +12,7 @@ BASE_URL = "https://maximum.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ro/telefoane-si-gadgeturi/telefoane-si-comunicatii/smartphoneuri/",
     "Ноутбуки": "/ro/tehnica-computerizata/laptopuri-si-computere/laptopuri/",
+    "Телевизоры": "/ro/televizoare/televizoare/televizoare/",
 }
 
 _CARD = "div.product__item"

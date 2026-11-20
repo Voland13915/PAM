@@ -13,6 +13,7 @@ BASE_URL = "https://www.cactus.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/catalogue/electronice/telefone/mobilnye-telefony/",
     "Ноутбуки": "/ru/catalogue/electronice/kompyuternaya-tehnika/noutbuki/",
+    "Телевизоры": "/ru/catalogue/electronice/televizory/televizory/",
 }
 
 _CARD = "div.catalog__pill"

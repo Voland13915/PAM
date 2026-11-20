@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple
 from . import catalog
 from .db import conn
 from .grouping import Entry, cluster, comparable_fields
+from . import tv
 from .matching import brand_from_title, match_parts, model_and_memory, product_name, trimmed_keys
 from .specs import DISPLAY_ORDER, Specs, parse_specs
 
@@ -20,13 +21,14 @@ def _groups(offers) -> Dict[str, Tuple[List, Specs]]:
     parts = []
     for offer in offers:
         brand = _brand(offer)
-        base, _, _ = match_parts(offer["category"], brand, offer["title"])
+        base, _, _ = match_parts(offer["category"], brand, offer["title"], offer["details"])
         parts.append((offer, brand, base))
 
     bases = {base for _, _, base in parts}
     alias: Dict[str, str] = {}
     for base in bases:
-        alias[base] = next((t for t in trimmed_keys(base) if t in bases), base)
+        candidates = trimmed_keys(base) + tv.aliases(base, bases)
+        alias[base] = next((t for t in candidates if t in bases), base)
 
     def resolve(key: str) -> str:
         while alias.get(key, key) != key:
@@ -37,7 +39,7 @@ def _groups(offers) -> Dict[str, Tuple[List, Specs]]:
     for offer, brand, base in parts:
         root = resolve(base)
         _, memory = model_and_memory(offer["title"], brand)
-        specs = parse_specs(offer["category"], offer["details"], memory, offer["title"])
+        specs = parse_specs(offer["category"], offer["details"], memory, offer["title"], brand)
         fields = comparable_fields(offer["category"], root, brand.lower() == "apple")
         entries[root].append(Entry(offer, root, offer["category"], specs, fields))
 
@@ -80,7 +82,8 @@ def rematch() -> Dict[str, int]:
             candidates = [old_keys.get(key)] + sorted({o["product_id"] for o in group})
             target = next((p for p in candidates if p in affected and p not in used), None)
             first = group[0]
-            name = product_name(first["category"], [o["title"] for o in group], specs)
+            name = product_name(first["category"], [o["title"] for o in group], specs,
+                                [_brand(o) for o in group])
             if target is None:
                 target = catalog.create_product(name, _brand(first), first["category"])
             used.add(target)

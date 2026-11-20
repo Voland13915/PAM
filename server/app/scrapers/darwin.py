@@ -14,6 +14,7 @@ BASE_URL = "https://darwin.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/telefoane/smartphone",
     "Ноутбуки": "/ru/noutbuki",
+    "Телевизоры": "/ru/tv-i-akssesuary/televizory",
 }
 
 _CARD = "div.product-card.product-item"

@@ -11,6 +11,8 @@ uploads/
 # Страницы, сохранённые парсером (--save-html pages)
 pages/
 matching_report.txt
+*_report.txt
+tv_pages/
 offers.csv
 product_pages/
 

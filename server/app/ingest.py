@@ -40,7 +40,7 @@ def save_items(
             if round(existing["price"], 2) != round(item.price, 2):
                 stats["price_changes"] += 1
         else:
-            base, _, _ = match_parts(category, item.brand, item.title)
+            base, _, _ = match_parts(category, item.brand, item.title, item.details)
             row = conn.execute(
                 "SELECT id FROM products WHERE match_key = ?", (base,)
             ).fetchone()

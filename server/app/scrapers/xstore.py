@@ -12,6 +12,7 @@ BASE_URL = "https://xstore.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/telefony/smartfony",
     "Ноутбуки": "/ru/noutbuki",
+    "Телевизоры": "/ru/televizory",
 }
 
 _CARD = "figure.card-product"
@@ -41,6 +42,8 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
         attributes = text_of(card, ".xnc-attr")
         if category == "Ноутбуки":
             title, details = name, laptop_details(attributes)
+        elif category == "Телевизоры":
+            title, details = name, attributes
         else:
             title, details = phone_title(name, attributes), ""
         image = card.select_one("img.xnc-img")

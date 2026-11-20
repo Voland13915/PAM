@@ -1,6 +1,7 @@
 import re
 from typing import List, Optional, Tuple
 
+from . import tv
 from .specs import Specs, size_label
 
 _PREFIX = re.compile(
@@ -50,6 +51,18 @@ _BRANDS = {
     "energizer": "Energizer", "prestigio": "Prestigio", "razer": "Razer", "gateway": "Gateway",
     "chuwi": "Chuwi", "machenike": "Machenike", "thunderobot": "Thunderobot",
     "iphone": "Apple", "ipad": "Apple", "macbook": "Apple", "galaxy": "Samsung",
+    "hisense": "Hisense", "philips": "Philips", "kivi": "KIVI", "vesta": "Vesta",
+    "blaupunkt": "Blaupunkt", "haier": "Haier", "sharp": "Sharp", "horizon": "Horizon",
+    "diamant": "Diamant", "yandex": "Yandex", "toshiba": "Toshiba", "panasonic": "Panasonic",
+    "thomson": "Thomson", "skyworth": "Skyworth", "ud": "UD", "nec": "NEC", "ozon": "Ozon",
+}
+
+
+_NOT_BRANDS = {
+    "smartphone", "laptop", "notebook", "telefon", "mobil", "gaming", "business", "workstation",
+    "ultrabook", "consumer", "smb", "televizor", "tv", "smart", "led", "qled", "oled", "hi-qled",
+    "miniled", "mini", "micro", "rgb", "nanocell", "qned", "dled", "qd", "qd-miniled", "evo",
+    "uhd", "neo",
 }
 
 
@@ -66,8 +79,7 @@ def brand_from_title(title: str) -> str:
         word = token.strip(",.;:()\"'")
         if not word or _CYRILLIC.search(word.lower()) or not re.fullmatch(r"[A-Za-z][A-Za-z\-]*", word):
             continue
-        if word.lower() in ("smartphone", "laptop", "notebook", "telefon", "mobil", "gaming",
-                            "business", "workstation", "ultrabook", "consumer", "smb"):
+        if word.lower() in _NOT_BRANDS:
             continue
         return canonical_brand(word)
     return ""
@@ -239,7 +251,11 @@ def _key(category: str, model: List[str], memory_part: str, refurbished: str) ->
     return "%s|%s|%s%s" % (category, " ".join(model), memory_part, refurbished)
 
 
-def match_parts(category: str, brand: str, title: str) -> Tuple[str, str, Optional[int]]:
+def match_parts(category: str, brand: str, title: str,
+                details: str = "") -> Tuple[str, str, Optional[int]]:
+    if category == tv.CATEGORY:
+        key = tv.key(title, brand, details)
+        return key, key, None
     refurbished = "|ref" if is_refurbished(title) else ""
     if category == "Ноутбуки":
         code = laptop_code(title, brand)
@@ -268,7 +284,7 @@ def match_parts(category: str, brand: str, title: str) -> Tuple[str, str, Option
 
 def trimmed_keys(key: str) -> List[str]:
     parts = key.split("|")
-    if len(parts) < 3 or parts[1] in ("title", "code"):
+    if len(parts) < 3 or parts[1] in ("title", "code", "model"):
         return []
     model = parts[1].split()
     result = []
@@ -282,8 +298,8 @@ def trimmed_keys(key: str) -> List[str]:
     return result
 
 
-def match_key(category: str, brand: str, title: str) -> str:
-    return match_parts(category, brand, title)[1]
+def match_key(category: str, brand: str, title: str, details: str = "") -> str:
+    return match_parts(category, brand, title, details)[1]
 
 
 def display_name(title: str) -> str:
@@ -368,7 +384,10 @@ def _memory_before_colour(title: str) -> bool:
     return bool(positions) and positions[0] < len(words) - 1
 
 
-def product_name(category: str, titles: List[str], specs: Specs) -> str:
+def product_name(category: str, titles: List[str], specs: Specs,
+                 brands: Optional[List[str]] = None) -> str:
+    if category == tv.CATEGORY:
+        return tv.product_name(titles, brands or [brand_from_title(t) for t in titles], specs)
     if category != "Ноутбуки":
         preferred = [t for t in titles if _memory_before_colour(t)]
         return _phone_name(display_name((preferred or titles)[0]), specs)

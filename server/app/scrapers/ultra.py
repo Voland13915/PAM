@@ -12,6 +12,7 @@ BASE_URL = "https://ultra.md"
 CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/telefony/smartfony",
     "Ноутбуки": "/ru/kompyuternaya-tekhnika/noutbuki",
+    "Телевизоры": "/ru/televizory-i-aksessuary/televizory",
 }
 
 _CARD = "div.product-card"
