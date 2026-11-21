@@ -14,6 +14,10 @@ CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/catalog/electronics/telephones/mobile/",
     "Ноутбуки": "/ru/catalog/electronics/orgtech/notebooks/",
     "Телевизоры": "/ru/catalog/electronics/tv/tv/",
+    "Стиральные машины": "/ru/catalog/appliances/home_appliances/washing_machines/",
+    "Холодильники": "/ru/catalog/appliances/home_appliances/fridges/",
+    "Пылесосы": "/ru/catalog/appliances/house_technics/vacuum_cleaners/",
+    "Микроволновки": "/ru/catalog/appliances/home_appliances/microwave_ovens/",
 }
 
 _CARD = "div.card.js-itemsList-item"
@@ -124,11 +128,11 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
         properties = _properties(card)
         if category == "Ноутбуки":
             title, details = laptop_title(raw_title), laptop_details(raw_title, properties)
-        elif category == "Телевизоры":
+        elif category == "Смартфоны":
+            title, details = raw_title, phone_details(properties)
+        else:
             title = raw_title
             details = " / ".join("%s: %s" % pair for pair in properties.items())
-        else:
-            title, details = raw_title, phone_details(properties)
         image = card.select_one("meta[itemprop=image]")
         items.append(ScrapedItem(
             external_id=code,

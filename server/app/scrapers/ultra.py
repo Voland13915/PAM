@@ -13,6 +13,10 @@ CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/telefony/smartfony",
     "Ноутбуки": "/ru/kompyuternaya-tekhnika/noutbuki",
     "Телевизоры": "/ru/televizory-i-aksessuary/televizory",
+    "Стиральные машины": "/ru/stirka-i-sushka/stiralnye-mashiny",
+    "Холодильники": "/ru/krupnaya-tekhnika-dlya-kukhni/kholodilniki",
+    "Пылесосы": "/ru/uborka-doma/pylesosy",
+    "Микроволновки": "/ru/prigotovlenie-pischi/mikrovolnovki",
 }
 
 _CARD = "div.product-card"

@@ -1,18 +1,35 @@
 import re
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from bs4 import BeautifulSoup
 
 from ..matching import brand_from_title
-from .base import Fetcher, PageNotFound, ParseError, ScrapedItem, pick_image
+from .base import Fetcher, PageNotFound, ParseError, ScrapedItem, paths, pick_image
 
 STORE = ("maximum", "Maximum", "maximum.md")
 BASE_URL = "https://maximum.md"
 
-CATEGORIES: Dict[str, str] = {
+_WASHERS = "/ru/krupnaya-bytovaya-tehnika/stiralnye-i-sushilnye-mashiny/"
+_FRIDGES = "/ru/krupnaya-bytovaya-tehnika/holodilniki/"
+_VACUUMS = "/ru/krupnaya-bytovaya-tehnika/pylesosy/"
+
+CATEGORIES: Dict[str, Union[str, Tuple[str, ...]]] = {
     "Смартфоны": "/ro/telefoane-si-gadgeturi/telefoane-si-comunicatii/smartphoneuri/",
     "Ноутбуки": "/ro/tehnica-computerizata/laptopuri-si-computere/laptopuri/",
     "Телевизоры": "/ro/televizoare/televizoare/televizoare/",
+    "Стиральные машины": tuple(_WASHERS + p for p in (
+        "stiralnye-mashiny-s-frontalnoj-zagruzkoj/", "stiralnye-mashiny-s-sushkoj/",
+        "stiralnye-mashiny-s-vertikalnoj-zagruzkoj/",
+    )),
+    "Холодильники": tuple(_FRIDGES + p for p in (
+        "holodilniki-sidebyside-i-french-door/", "holodilniki-s-nijnej-morozilnoj-kameroj/",
+        "holodilniki-s-verhnej-morozilnoj-kameroj/", "holodilniki-odnodvernye/",
+    )),
+    "Пылесосы": tuple(_VACUUMS + p for p in (
+        "pylesosy-roboty/", "pylesosy-portativnye/", "pylesosy-bez-meshka/", "pylesosy-s-meshkom/",
+        "pylesosy-s-akvafiltrom/", "pylesosy-moyushhie/", "pylesosy-vertikalnye/",
+    )),
+    "Микроволновки": "/ru/krupnaya-bytovaya-tehnika/mikrovolnovye-pechi/mikrovolnovye-pechi/",
 }
 
 _CARD = "div.product__item"
@@ -22,13 +39,14 @@ _PRICE_OLD = ".product__item__price-old"
 _COUNTER = ".page__header__title__counter"
 _DESCRIPTION = ".product-item-description"
 _CODE = ".product-item-description-code"
-_OUT_OF_STOCK = re.compile(r"nu este [îi]n stoc", re.IGNORECASE)
-_AMOUNT = re.compile(r"(\d[\d\s ]*)\s*lei(?!\s*/)")
-_PRODUCT_ID = re.compile(r"/ro/(\d+)/?$")
+_OUT_OF_STOCK = re.compile(r"nu este [îi]n stoc|нет в наличии", re.IGNORECASE)
+_CURRENCY = re.compile(r"lei|ле[еи]в|лей", re.IGNORECASE)
+_AMOUNT = re.compile(r"(\d[\d\s\u00a0]*)\s*(?:lei|ле[еи]в|лей)(?!\s*/)", re.IGNORECASE)
+_PRODUCT_ID = re.compile(r"/(?:ro|ru)/(\d+)/?$")
 
 
 def _price(text: str) -> Optional[float]:
-    digits = re.sub(r"[^\d]", "", text.split("lei")[0])
+    digits = re.sub(r"[^\d]", "", _CURRENCY.split(text)[0])
     return float(digits) if digits else None
 
 
@@ -92,7 +110,7 @@ def parse_listing(html: str) -> List[ScrapedItem]:
             old_price = _price(old_el.get_text(" "))
         else:
             block = current.parent.get_text(" ") if current.parent is not None else ""
-            amounts = [_price(a + " lei") for a in _AMOUNT.findall(block)]
+            amounts = [_price(a) for a in _AMOUNT.findall(block)]
             old_price = max([a for a in amounts if a], default=None)
         title = " ".join(link.get_text(" ").split())
         items.append(ScrapedItem(
@@ -112,8 +130,13 @@ def parse_listing(html: str) -> List[ScrapedItem]:
 def scrape_category(
     fetcher: Fetcher, category: str, max_pages: int = 60
 ) -> Iterator[ScrapedItem]:
-    path = CATEGORIES[category]
-    seen = set()
+    seen: set = set()
+    for path in paths(CATEGORIES[category]):
+        yield from _scrape_path(fetcher, path, max_pages, seen)
+
+
+def _scrape_path(fetcher: Fetcher, path: str, max_pages: int, seen: set) -> Iterator[ScrapedItem]:
+    path_seen: set = set()
     total = None
     for page in range(1, max_pages + 1):
         try:
@@ -130,11 +153,13 @@ def scrape_category(
             if page == 1:
                 raise
             break
-        fresh = [i for i in items if i.external_id not in seen]
-        if not fresh:
+        page_ids = {i.external_id for i in items}
+        if page_ids <= path_seen:
             break
-        for item in fresh:
-            seen.add(item.external_id)
-            yield item
-    if total and len(seen) < total and page < max_pages:
-        print("  внимание: на сайте указано товаров: %d, собрано: %d" % (total, len(seen)))
+        path_seen |= page_ids
+        for item in items:
+            if item.external_id not in seen:
+                seen.add(item.external_id)
+                yield item
+    if total and len(path_seen) < total and page < max_pages:
+        print("  внимание: на сайте указано товаров: %d, собрано: %d" % (total, len(path_seen)))

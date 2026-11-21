@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/auth_api.dart';
+import '../data/offline_status.dart';
 import '../data/product.dart';
+import '../data/response_cache.dart';
 import '../models/catalog_model.dart';
 import '../models/session_model.dart';
 import '../models/shopping_list_model.dart';
@@ -34,6 +36,9 @@ class ProfileScreen extends StatelessWidget {
     if (ok != true || !context.mounted) return;
     await context.read<AuthApi>().logout();
     if (!context.mounted) return;
+    await context.read<ResponseCache>().clear();
+    if (!context.mounted) return;
+    context.read<OfflineStatus>().online();
     context.read<ShoppingListModel>().clear();
     context.read<SessionModel>().signOut();
     context.go('/login');

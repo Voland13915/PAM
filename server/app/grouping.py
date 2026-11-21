@@ -24,7 +24,8 @@ class Cluster:
 
 
 def comparable_fields(category: str, base: str, apple: bool) -> Tuple[str, ...]:
-    if category == "Телевизоры":
+    if category in ("Телевизоры", "Стиральные машины", "Холодильники", "Пылесосы",
+                    "Микроволновки"):
         return ()
     if category == "Ноутбуки":
         return ("ram", "storage", "cpu", "screen")

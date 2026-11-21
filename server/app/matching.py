@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional, Tuple
 
-from . import tv
+from . import appliances, tv
 from .specs import Specs, size_label
 
 _PREFIX = re.compile(
@@ -54,7 +54,16 @@ _BRANDS = {
     "hisense": "Hisense", "philips": "Philips", "kivi": "KIVI", "vesta": "Vesta",
     "blaupunkt": "Blaupunkt", "haier": "Haier", "sharp": "Sharp", "horizon": "Horizon",
     "diamant": "Diamant", "yandex": "Yandex", "toshiba": "Toshiba", "panasonic": "Panasonic",
-    "thomson": "Thomson", "skyworth": "Skyworth", "ud": "UD", "nec": "NEC", "ozon": "Ozon",
+    "thomson": "Thomson", "thomas": "Thomas", "karcher": "Karcher",
+    "aeg": "AEG", "bosch": "Bosch", "beko": "Beko", "whirlpool": "Whirlpool",
+    "electrolux": "Electrolux", "gorenje": "Gorenje", "indesit": "Indesit", "hotpoint": "Hotpoint",
+    "hotpoint-ariston": "Hotpoint-Ariston", "candy": "Candy", "liebherr": "Liebherr",
+    "midea": "Midea", "haier": "Haier", "heinner": "Heinner", "artel": "Artel", "dyson": "Dyson",
+    "dreame": "Dreame", "roborock": "Roborock", "rowenta": "Rowenta", "tefal": "Tefal",
+    "polaris": "Polaris", "zanussi": "Zanussi", "smeg": "SMEG", "teka": "Teka", "hansa": "Hansa",
+    "arctic": "Arctic", "snaige": "Snaige", "atlant": "Atlant", "daewoo": "Daewoo",
+    "adler": "Adler", "mova": "Mova", "shark": "Shark", "ihunt": "iHunt",
+    "black&decker": "Black+Decker", "black+decker": "Black+Decker", "skyworth": "Skyworth", "ud": "UD", "nec": "NEC", "ozon": "Ozon",
 }
 
 
@@ -62,7 +71,11 @@ _NOT_BRANDS = {
     "smartphone", "laptop", "notebook", "telefon", "mobil", "gaming", "business", "workstation",
     "ultrabook", "consumer", "smb", "televizor", "tv", "smart", "led", "qled", "oled", "hi-qled",
     "miniled", "mini", "micro", "rgb", "nanocell", "qned", "dled", "qd", "qd-miniled", "evo",
-    "uhd", "neo",
+    "uhd", "neo", "sidebyside", "side", "french", "door", "nofrost", "inverter", "combi",
+    "masina", "de", "spalat", "rufe", "slim", "frontala", "incorporabila", "incorporabil",
+    "semiautomat", "combina", "frigorifica", "frigider", "cu", "doua", "usi", "o", "usa", "racitor",
+    "aspirator", "cuptor", "microunde", "robot", "aspirare", "mana", "vertical", "fara", "fir",
+    "autonom", "curatare", "geamuri", "uscator", "congelator", "by",
 }
 
 
@@ -75,6 +88,10 @@ def canonical_brand(word: str) -> str:
 
 
 def brand_from_title(title: str) -> str:
+    for token in clean_title(title).split(",")[0].split():
+        known = _BRANDS.get(token.strip(",.;:()\"'").lower())
+        if known:
+            return known
     for token in clean_title(title).split():
         word = token.strip(",.;:()\"'")
         if not word or _CYRILLIC.search(word.lower()) or not re.fullmatch(r"[A-Za-z][A-Za-z\-]*", word):
@@ -256,6 +273,9 @@ def match_parts(category: str, brand: str, title: str,
     if category == tv.CATEGORY:
         key = tv.key(title, brand, details)
         return key, key, None
+    if category in appliances.KINDS:
+        key = appliances.key(category, title, brand, details)
+        return key, key, None
     refurbished = "|ref" if is_refurbished(title) else ""
     if category == "Ноутбуки":
         code = laptop_code(title, brand)
@@ -388,6 +408,9 @@ def product_name(category: str, titles: List[str], specs: Specs,
                  brands: Optional[List[str]] = None) -> str:
     if category == tv.CATEGORY:
         return tv.product_name(titles, brands or [brand_from_title(t) for t in titles], specs)
+    if category in appliances.KINDS:
+        return appliances.product_name(category, titles,
+                                       brands or [brand_from_title(t) for t in titles])
     if category != "Ноутбуки":
         preferred = [t for t in titles if _memory_before_colour(t)]
         return _phone_name(display_name((preferred or titles)[0]), specs)

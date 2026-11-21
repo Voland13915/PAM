@@ -14,6 +14,9 @@ _CPU_NOISE = {"intel", "amd", "apple", "qualcomm", "core", "processor", "process
 DISPLAY_ORDER = [
     "Процессор", "Оперативная память", "Накопитель", "Экран", "Матрица", "Частота экрана",
     "Разрешение", "Smart-платформа", "Видеокарта", "Видеопамять", "Камера", "Аккумулятор",
+    "Тип", "Установка", "Загрузка белья", "Загрузка", "Отжим", "Сушка", "Общий объём", "Разморозка", "Объём",
+    "Мощность", "Мощность всасывания", "Время работы", "Потребляемая мощность",
+    "Класс энергопотребления",
 ]
 
 
@@ -149,6 +152,9 @@ def parse_specs(category: str, details: str, memory=None, title: str = "", brand
     if category == "Телевизоры":
         from . import tv
         return tv.parse_specs(title, details, brand)
+    from . import appliances
+    if category in appliances.KINDS:
+        return appliances.parse_specs(category, title, details)
     specs = Specs()
     details = (details or "").strip()
     if ": " in details and "|" not in details:

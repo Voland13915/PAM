@@ -1,6 +1,6 @@
 from typing import Dict, Iterable
 
-from . import catalog
+from . import appliances, catalog
 from .db import conn
 from .matching import display_name, match_parts
 from .scrapers import AUTOMATIC
@@ -28,6 +28,8 @@ def save_items(
 ) -> Dict[str, int]:
     stats = {"items": 0, "new_products": 0, "new_offers": 0, "price_changes": 0}
     for item in items:
+        if not appliances.belongs(category, item.title):
+            continue
         stats["items"] += 1
         existing = conn.execute(
             "SELECT product_id, price, in_stock FROM offers "

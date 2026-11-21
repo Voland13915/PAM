@@ -2,7 +2,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List, Optional
+from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -147,6 +147,10 @@ class Fetcher:
 
     def close(self) -> None:
         self._client.close()
+
+
+def paths(value: Union[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+    return (value,) if isinstance(value, str) else tuple(value)
 
 
 def amount(text: Optional[str]) -> Optional[float]:

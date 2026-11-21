@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +9,8 @@ import 'data/auth_user.dart';
 import 'data/http_product_repository.dart';
 import 'data/http_store_repository.dart';
 import 'data/http_wishlist_repository.dart';
+import 'data/offline_status.dart';
+import 'data/response_cache.dart';
 import 'data/result.dart';
 import 'data/token_store.dart';
 import 'models/catalog_model.dart';
@@ -25,14 +29,21 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final tokens = TokenStore();
-  final api = ApiClient(apiBase, tokens);
+  final cache = ResponseCache();
+  final offline = OfflineStatus();
+  unawaited(cache.prune());
+  final api = ApiClient(apiBase, tokens, cache: cache, offline: offline);
   final auth = AuthApi(api, tokens);
 
   final user = await _currentUser(tokens, auth);
   final loggedIn = await tokens.read() != null;
 
   router = createRouter(loggedIn ? '/catalog' : '/login');
-  api.onUnauthorized = () => router.go('/login');
+  api.onUnauthorized = () {
+    unawaited(cache.clear());
+    offline.online();
+    router.go('/login');
+  };
 
   final productRepository = HttpProductRepository(api);
   final storeRepository = HttpStoreRepository(api);
@@ -42,6 +53,8 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         Provider<AuthApi>.value(value: auth),
+        Provider<ResponseCache>.value(value: cache),
+        ChangeNotifierProvider<OfflineStatus>.value(value: offline),
         ChangeNotifierProvider(
           create: (_) => CatalogModel(productRepository, storeRepository)
             ..load(), // DI — как на L4

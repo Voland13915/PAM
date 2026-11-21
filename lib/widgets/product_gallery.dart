@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/image_cache.dart';
 import '../models/catalog_model.dart';
 import 'product_image.dart';
 
@@ -100,18 +102,15 @@ class _ProductGalleryState extends State<ProductGallery> {
                         onTap: () => _openFullscreen(images, index),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Image.network(
-                            images[index],
+                          child: CachedNetworkImage(
+                            imageUrl: images[index],
+                            cacheManager: productImages,
                             fit: BoxFit.contain,
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null
-                                    ? child
-                                    : const Center(
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      ),
-                            errorBuilder: (context, error, stackTrace) {
-                              _markFailed(images[index]);
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            errorWidget: (context, url, error) {
+                              _markFailed(url);
                               return const SizedBox.shrink();
                             },
                           ),
@@ -210,13 +209,13 @@ class _FullscreenGalleryState extends State<FullscreenGallery> {
         itemBuilder: (context, index) => InteractiveViewer(
           maxScale: 4,
           child: Center(
-            child: Image.network(
-              widget.images[index],
+            child: CachedNetworkImage(
+              imageUrl: widget.images[index],
+              cacheManager: productImages,
               fit: BoxFit.contain,
-              loadingBuilder: (context, child, progress) => progress == null
-                  ? child
-                  : const CircularProgressIndicator(strokeWidth: 2),
-              errorBuilder: (context, error, stackTrace) => Column(
+              placeholder: (context, url) =>
+                  const CircularProgressIndicator(strokeWidth: 2),
+              errorWidget: (context, url, error) => Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.broken_image_outlined,

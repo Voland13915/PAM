@@ -1,4 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../data/image_cache.dart';
 
 class ProductImage extends StatelessWidget {
   final String category;
@@ -48,13 +51,13 @@ class ProductImage extends StatelessWidget {
         height: size,
         color: Colors.white,
         padding: EdgeInsets.all(size * 0.06),
-        child: Image.network(
-          imageUrl,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          cacheManager: productImages,
           fit: BoxFit.contain,
-          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-          loadingBuilder: (context, child, progress) =>
-              progress == null ? child : placeholder(),
-          errorBuilder: (context, error, stackTrace) => placeholder(),
+          memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          placeholder: (context, url) => placeholder(),
+          errorWidget: (context, url, error) => placeholder(),
         ),
       ),
     );

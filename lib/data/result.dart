@@ -3,8 +3,9 @@ sealed class Result<T> {
 }
 
 class Ok<T> extends Result<T> {
-  const Ok(this.value);
+  const Ok(this.value, {this.savedAt});
   final T value;
+  final DateTime? savedAt;
 }
 
 class Err<T> extends Result<T> {

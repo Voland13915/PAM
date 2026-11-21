@@ -14,6 +14,10 @@ CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/catalogue/electronice/telefone/mobilnye-telefony/",
     "Ноутбуки": "/ru/catalogue/electronice/kompyuternaya-tehnika/noutbuki/",
     "Телевизоры": "/ru/catalogue/electronice/televizory/televizory/",
+    "Стиральные машины": "/ru/catalogue/bytovaya-tehnika/krupnaya-bytovaya-tehnika/stiralnye-mashiny/",
+    "Холодильники": "/ru/catalogue/bytovaya-tehnika/krupnaya-bytovaya-tehnika/holodilniki-i-morozilniki/",
+    "Пылесосы": "/ru/catalogue/bytovaya-tehnika/tehnika-dlya-doma/pylesosy/",
+    "Микроволновки": "/ru/catalogue/bytovaya-tehnika/tehnika-dlya-kuhni/mikrovolnovye-pechi/",
 }
 
 _CARD = "div.catalog__pill"
@@ -66,6 +70,13 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
             continue
         image = card.select_one("img")
         laptop = category == "Ноутбуки"
+        features = " / ".join(text_of(li) for li in card.select(".description__list li"))
+        if laptop:
+            details = laptop_details(title)
+        elif category in ("Смартфоны", "Телевизоры"):
+            details = ""
+        else:
+            details = features
         items.append(ScrapedItem(
             external_id=code,
             title=laptop_title(title) if laptop else title,
@@ -74,7 +85,7 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
             old_price=old_price if old_price and old_price > price else None,
             url=absolute(link["href"], BASE_URL),
             in_stock=True,
-            details=laptop_details(title) if laptop else "",
+            details=details,
             image_url=absolute(image.get("src", ""), BASE_URL) if image is not None else "",
             color=title,
         ))

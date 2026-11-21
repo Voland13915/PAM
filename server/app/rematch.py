@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple
 from . import catalog
 from .db import conn
 from .grouping import Entry, cluster, comparable_fields
-from . import tv
+from . import codes
 from .matching import brand_from_title, match_parts, model_and_memory, product_name, trimmed_keys
 from .specs import DISPLAY_ORDER, Specs, parse_specs
 
@@ -27,7 +27,7 @@ def _groups(offers) -> Dict[str, Tuple[List, Specs]]:
     bases = {base for _, _, base in parts}
     alias: Dict[str, str] = {}
     for base in bases:
-        candidates = trimmed_keys(base) + tv.aliases(base, bases)
+        candidates = trimmed_keys(base) + codes.aliases(base, bases)
         alias[base] = next((t for t in candidates if t in bases), base)
 
     def resolve(key: str) -> str:

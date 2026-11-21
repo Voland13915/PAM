@@ -14,6 +14,10 @@ CATEGORIES: Dict[str, str] = {
     "Смартфоны": "/ru/smartphone",
     "Ноутбуки": "/ru/laptopuri",
     "Телевизоры": "/ru/televizoare",
+    "Стиральные машины": "/ru/masini-de-spalat",
+    "Холодильники": "/ru/frigidere",
+    "Пылесосы": "/ru/aspiratoare",
+    "Микроволновки": "/ru/cuptoare-cu-microunde",
 }
 
 _CARD = "div.category-product-card"
@@ -53,10 +57,10 @@ def parse_listing(html: str, category: str = "Смартфоны") -> List[Scrap
         price, highest = min(prices), max(prices)
         if category == "Ноутбуки":
             title, details = laptop_model(raw_title), laptop_details(raw_title)
-        elif category == "Телевизоры":
-            title, details = raw_title, raw_title
-        else:
+        elif category == "Смартфоны":
             title, details = raw_title, ""
+        else:
+            title, details = raw_title, raw_title
         image = card.select_one(".custom_product_image_default img")
         items.append(ScrapedItem(
             external_id=link["data-product-id"],
