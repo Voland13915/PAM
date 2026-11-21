@@ -10,9 +10,12 @@ import 'data/http_product_repository.dart';
 import 'data/http_store_repository.dart';
 import 'data/http_wishlist_repository.dart';
 import 'data/offline_status.dart';
+import 'data/product_repository.dart';
 import 'data/response_cache.dart';
+import 'data/store_repository.dart';
 import 'data/result.dart';
 import 'data/token_store.dart';
+import 'models/app_settings.dart';
 import 'models/catalog_model.dart';
 import 'models/session_model.dart';
 import 'models/shopping_list_model.dart';
@@ -28,6 +31,7 @@ const apiBase = String.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final settings = await AppSettings.load();
   final tokens = TokenStore();
   final cache = ResponseCache();
   final offline = OfflineStatus();
@@ -54,7 +58,10 @@ Future<void> main() async {
       providers: [
         Provider<AuthApi>.value(value: auth),
         Provider<ResponseCache>.value(value: cache),
+        Provider<ProductRepository>.value(value: productRepository),
+        Provider<StoreRepository>.value(value: storeRepository),
         ChangeNotifierProvider<OfflineStatus>.value(value: offline),
+        ChangeNotifierProvider<AppSettings>.value(value: settings),
         ChangeNotifierProvider(
           create: (_) => CatalogModel(productRepository, storeRepository)
             ..load(), // DI — как на L4
@@ -91,18 +98,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<AppSettings?>();
     return MaterialApp.router(
       title: 'TechPrice',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00796B),
-        ),
-        textTheme: const TextTheme(
-          titleLarge: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
+      theme: _theme(Brightness.light),
+      darkTheme: _theme(Brightness.dark),
+      themeMode: settings?.themeMode ?? ThemeMode.system,
       routerConfig: router,
     );
   }
 }
+
+ThemeData _theme(Brightness brightness) => ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF00796B),
+        brightness: brightness,
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );

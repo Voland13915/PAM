@@ -11,12 +11,14 @@ class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
   final Widget? footer;
+  final int? storeId;
 
   const ProductCard({
     super.key,
     required this.product,
     this.onTap,
     this.footer,
+    this.storeId,
   });
 
   @override
@@ -24,9 +26,12 @@ class ProductCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final best = product.bestOffer;
-    final bestStoreName =
-        context.watch<CatalogModel>().storeName(best.storeId);
+    final catalog = context.watch<CatalogModel>();
+    final bestStoreName = catalog.storeName(best.storeId);
     final count = product.offers.length;
+    final storeOffer = storeId == null
+        ? null
+        : product.offers.where((o) => o.storeId == storeId).firstOrNull;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -79,8 +84,17 @@ class ProductCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 8),
-                        if (product.isAvailable)
-                          Row(
+                        if (storeOffer != null)
+                          _StorePrice(
+                            offer: storeOffer,
+                            best: best,
+                            bestStoreName: bestStoreName,
+                            stores: product.offers.where((o) => o.inStock).length,
+                          )
+                        else if (product.isAvailable)
+                          Wrap(
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 'от ${formatPrice(best.price)}',
@@ -89,13 +103,9 @@ class ProductCard extends StatelessWidget {
                                   color: scheme.primary,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'в $bestStoreName',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.bodySmall,
-                                ),
+                              Text(
+                                'в $bestStoreName',
+                                style: text.bodySmall,
                               ),
                             ],
                           )
@@ -107,13 +117,14 @@ class ProductCard extends StatelessWidget {
                               color: scheme.error,
                             ),
                           ),
-                        Text(
-                          product.isAvailable
-                              ? 'Цены в $count ${storesWord(count)}'
-                              : 'Последняя цена ${formatPrice(best.price)}',
-                          style: text.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
+                        if (storeOffer == null)
+                          Text(
+                            product.isAvailable
+                                ? 'Цены в $count ${storesWord(count)}'
+                                : 'Последняя цена ${formatPrice(best.price)}',
+                            style: text.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
                       ],
                     ),
                   ),
@@ -127,6 +138,58 @@ class ProductCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StorePrice extends StatelessWidget {
+  final Offer offer;
+  final Offer best;
+  final String bestStoreName;
+  final int stores;
+
+  const _StorePrice({
+    required this.offer,
+    required this.best,
+    required this.bestStoreName,
+    required this.stores,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final elsewhere = best.storeId != offer.storeId && best.inStock;
+    final String note;
+    final Color noteColor;
+    if (!offer.inStock && elsewhere) {
+      note = 'Есть в $bestStoreName: ${formatPrice(best.price)}';
+      noteColor = scheme.onSurfaceVariant;
+    } else if (elsewhere && best.price < offer.price) {
+      note = 'Дешевле в $bestStoreName: ${formatPrice(best.price)}';
+      noteColor = scheme.error;
+    } else if (offer.inStock && stores > 1) {
+      note = 'Лучшая цена среди $stores ${storesWord(stores)}';
+      noteColor = scheme.primary;
+    } else if (offer.inStock) {
+      note = 'Есть только в этом магазине';
+      noteColor = scheme.onSurfaceVariant;
+    } else {
+      note = 'Последняя цена ${formatPrice(offer.price)}';
+      noteColor = scheme.onSurfaceVariant;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          offer.inStock ? formatPrice(offer.price) : 'Нет в наличии',
+          style: text.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: offer.inStock ? scheme.primary : scheme.error,
+          ),
+        ),
+        Text(note, style: text.bodySmall?.copyWith(color: noteColor)),
+      ],
     );
   }
 }

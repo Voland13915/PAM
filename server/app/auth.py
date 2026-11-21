@@ -14,6 +14,7 @@ from .errors import (
     string_field,
     unauthorized,
     validation_error,
+    wrong_password,
 )
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
@@ -139,3 +140,43 @@ async def me(user_id: int = Depends(require_auth)):
     return json_response(
         {"id": user["id"], "email": user["email"], "name": user["name"]}
     )
+
+
+MIN_PASSWORD_LENGTH = 6
+
+
+@router.patch("/me")
+async def update_me(request: Request, user_id: int = Depends(require_auth)):
+    body = await read_json_body(request)
+    name = None if body is None else string_field(body, "name")
+    if name is None:
+        raise validation_error("name is required")
+    if len(name) > 60:
+        raise validation_error("name is too long")
+    conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+    return await me(user_id)
+
+
+@router.post("/me/password")
+async def change_password(request: Request, user_id: int = Depends(require_auth)):
+    body = await read_json_body(request)
+    if body is None:
+        raise validation_error("Body must be a JSON object")
+    current = body.get("currentPassword")
+    new = body.get("newPassword")
+    if not isinstance(current, str) or not isinstance(new, str):
+        raise validation_error("currentPassword and newPassword are required")
+    if len(new) < MIN_PASSWORD_LENGTH:
+        raise validation_error("newPassword is too short")
+    user = conn.execute(
+        "SELECT password_hash FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    if user is None:
+        raise unauthorized()
+    if not verify_password(current, user["password_hash"]):
+        raise wrong_password()
+    conn.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (hash_password(new), user_id),
+    )
+    return json_response({"ok": True})

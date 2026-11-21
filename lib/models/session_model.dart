@@ -21,6 +21,12 @@ class SessionModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void rename(String name) {
+    if (name == _name) return;
+    _name = name;
+    notifyListeners();
+  }
+
   void signOut() {
     _name = null;
     _email = null;

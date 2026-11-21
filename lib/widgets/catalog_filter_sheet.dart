@@ -78,28 +78,30 @@ class _CatalogFilterSheetState extends State<CatalogFilterSheet> {
               children: [
                 Text('Фильтры', style: text.titleLarge),
                 const SizedBox(height: 16),
-                Text('Магазин', style: text.titleSmall),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ChoiceChip(
-                      label: const Text('Любой'),
-                      selected: _draft.storeId == null,
-                      onSelected: (_) => setState(
-                          () => _draft = _draft.copyWith(storeId: () => null)),
-                    ),
-                    for (final store in widget.stores)
+                if (widget.stores.isNotEmpty) ...[
+                  Text('Магазин', style: text.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
                       ChoiceChip(
-                        label: Text(
-                            '${store.name} · ${facets.storeCount(store.id)}'),
-                        selected: _draft.storeId == store.id,
+                        label: const Text('Любой'),
+                        selected: _draft.storeId == null,
                         onSelected: (_) => setState(() =>
-                            _draft = _draft.copyWith(storeId: () => store.id)),
+                            _draft = _draft.copyWith(storeId: () => null)),
                       ),
-                  ],
-                ),
+                      for (final store in widget.stores)
+                        ChoiceChip(
+                          label: Text(
+                              '${store.name} · ${facets.storeCount(store.id)}'),
+                          selected: _draft.storeId == store.id,
+                          onSelected: (_) => setState(() =>
+                              _draft = _draft.copyWith(storeId: () => store.id)),
+                        ),
+                    ],
+                  ),
+                ],
                 if (canSlide) ...[
                   const SizedBox(height: 20),
                   Text('Цена', style: text.titleSmall),

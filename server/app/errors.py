@@ -35,6 +35,10 @@ def not_found(message: str = "Resource not found") -> ApiError:
     return ApiError(404, "NOT_FOUND", message)
 
 
+def wrong_password() -> ApiError:
+    return ApiError(403, "WRONG_PASSWORD", "Current password is incorrect")
+
+
 def email_taken() -> ApiError:
     return ApiError(
         409, "EMAIL_TAKEN", "An account with this email already exists"

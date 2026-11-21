@@ -24,6 +24,21 @@ class AuthApi {
         parse: (json) => AuthUser.fromJson(json as Map<String, dynamic>),
       );
 
+  Future<Result<AuthUser>> updateName(String name) => _api.send(
+        'PATCH',
+        '/me',
+        body: {'name': name},
+        parse: (json) => AuthUser.fromJson(json as Map<String, dynamic>),
+      );
+
+  Future<Result<void>> changePassword(String current, String next) =>
+      _api.send(
+        'POST',
+        '/me/password',
+        body: {'currentPassword': current, 'newPassword': next},
+        parse: (_) {},
+      );
+
   Future<void> logout() => _tokens.clear();
 
   Future<Result<AuthUser>> _authorize(

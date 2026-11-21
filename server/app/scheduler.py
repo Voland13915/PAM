@@ -20,7 +20,7 @@ def enabled() -> bool:
 
 
 def run_at() -> time:
-    value = os.environ.get("SCRAPE_AT", "04:00")
+    value = os.environ.get("SCRAPE_AT", "13:00")
     try:
         hours, minutes = (int(part) for part in value.split(":", 1))
         return time(hours, minutes)

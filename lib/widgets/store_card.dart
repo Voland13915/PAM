@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../utils/formatters.dart';
+import 'flexible_tile.dart';
 
 class StoreCard extends StatelessWidget {
   final Store store;
@@ -14,10 +15,9 @@ class StoreCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
 
     return Card(
-      child: ListTile(
+      clipBehavior: Clip.antiAlias,
+      child: FlexibleTile(
         onTap: onTap,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: scheme.primaryContainer,
           foregroundColor: scheme.onPrimaryContainer,
@@ -26,7 +26,6 @@ class StoreCard extends StatelessWidget {
         title: Text(store.name, style: text.titleMedium),
         subtitle: Text(
             '${store.website}\nОбновлено: ${formatSyncTime(store.lastSync)}'),
-        isThreeLine: true,
         trailing: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,

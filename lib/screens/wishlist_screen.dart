@@ -71,23 +71,20 @@ class WishlistScreen extends StatelessWidget {
       );
     } else {
       final items = wishlist.items;
-      body = Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Text(
-              'Уведомим, когда цена опустится до желаемой. '
-              'Смахните карточку влево, чтобы перестать следить.',
-              style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              itemCount: items.length,
+      body = ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              itemCount: items.length + 1,
               separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
-                final item = items[index];
+                if (index == 0) {
+                  return Text(
+                    'Уведомим, когда цена опустится до желаемой. '
+                    'Смахните карточку влево, чтобы перестать следить.',
+                    style: text.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  );
+                }
+                final item = items[index - 1];
                 final product = catalog.byId(item.productId);
                 if (product == null) return const SizedBox.shrink();
                 return Dismissible(
@@ -115,10 +112,7 @@ class WishlistScreen extends StatelessWidget {
                   ),
                 );
               },
-            ),
-          ),
-        ],
-      );
+            );
     }
 
     return Scaffold(

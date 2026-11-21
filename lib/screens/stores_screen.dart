@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/catalog_model.dart';
@@ -32,6 +33,8 @@ class StoresScreen extends StatelessWidget {
             : StoreCard(
                 key: ValueKey(stores[index - 1].id),
                 store: stores[index - 1],
+                onTap: () =>
+                    context.push('/profile/stores/${stores[index - 1].id}'),
               ),
       );
     }

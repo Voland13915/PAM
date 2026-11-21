@@ -7,6 +7,7 @@ import '../models/catalog_model.dart';
 import '../models/shopping_list_model.dart';
 import '../utils/formatters.dart';
 import '../widgets/error_view.dart';
+import '../widgets/flexible_tile.dart';
 import '../widgets/info_row.dart';
 import '../widgets/price_row.dart';
 import '../widgets/product_card.dart';
@@ -161,7 +162,7 @@ class _ListContent extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                ListTile(
+                FlexibleTile(
                   leading: CircleAvatar(
                     backgroundColor: scheme.secondaryContainer,
                     foregroundColor: scheme.onSecondaryContainer,

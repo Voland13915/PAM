@@ -10,10 +10,12 @@ import '../data/store_repository.dart';
 import '../data/sync_status.dart';
 
 class CatalogModel extends ChangeNotifier {
-  CatalogModel(this._productRepository, this._storeRepository);
+  CatalogModel(this._productRepository, this._storeRepository, {this.storeId})
+      : _filter = CatalogFilter(storeId: storeId);
 
   final ProductRepository _productRepository;
   final StoreRepository _storeRepository;
+  final int? storeId;
 
   static const pageSize = 20;
 
@@ -23,7 +25,7 @@ class CatalogModel extends ChangeNotifier {
   List<Store> _stores = const [];
 
   String _search = '';
-  CatalogFilter _filter = const CatalogFilter();
+  CatalogFilter _filter;
   CatalogFacets _facets = CatalogFacets.empty;
   int _page = 1;
   bool _hasMore = false;
@@ -46,6 +48,8 @@ class CatalogModel extends ChangeNotifier {
   String? get loadMoreError => _loadMoreError;
 
   bool get isResolving => _resolving.isNotEmpty;
+
+  int get activeFilters => _filter.activeCount - (storeId != null ? 1 : 0);
 
   List<Product> get products => List.unmodifiable(_products);
   List<Store> get stores => List.unmodifiable(_stores);
@@ -87,7 +91,7 @@ class CatalogModel extends ChangeNotifier {
   Future<Result<SyncStatus>> startSync() => _storeRepository.startSync();
 
   Future<void> applyFilter(CatalogFilter filter) {
-    _filter = filter;
+    _filter = storeId == null ? filter : filter.copyWith(storeId: () => storeId);
     return load();
   }
 

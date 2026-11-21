@@ -12,7 +12,14 @@ import '../widgets/error_view.dart';
 import '../widgets/product_card.dart';
 
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key});
+  final String title;
+  final String basePath;
+
+  const CatalogScreen({
+    super.key,
+    this.title = 'Каталог',
+    this.basePath = '/catalog',
+  });
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -69,12 +76,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
     } else if (catalog.isLoading && catalog.products.isEmpty) {
       body = const Center(child: CircularProgressIndicator());
     } else {
-      body = _CatalogContent(catalog: catalog);
+      body = _CatalogContent(catalog: catalog, basePath: widget.basePath);
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Каталог'),
+        title: Text(widget.title),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -143,7 +150,7 @@ class _FilterBar extends StatelessWidget {
       builder: (_) => CatalogFilterSheet(
         filter: catalog.filter,
         facets: catalog.facets,
-        stores: catalog.stores,
+        stores: catalog.storeId == null ? catalog.stores : const [],
       ),
     );
     if (result != null && context.mounted) {
@@ -156,9 +163,10 @@ class _FilterBar extends StatelessWidget {
     final result = await showModalBottomSheet<CatalogSort>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
           children: [
             for (final sort in CatalogSort.values)
               ListTile(
@@ -200,7 +208,7 @@ class _FilterBar extends StatelessWidget {
           onDeleted: () => _apply(
               context, filter.copyWith(brands: {...filter.brands}..remove(brand))),
         ),
-      if (filter.storeId != null)
+      if (filter.storeId != null && catalog.storeId == null)
         InputChip(
           label: Text(catalog.storeName(filter.storeId!)),
           onDeleted: () => _apply(context, filter.copyWith(storeId: () => null)),
@@ -263,8 +271,8 @@ class _FilterBar extends StatelessWidget {
             children: [
               ActionChip(
                 avatar: Badge(
-                  isLabelVisible: filter.activeCount > 0,
-                  label: Text('${filter.activeCount}'),
+                  isLabelVisible: catalog.activeFilters > 0,
+                  label: Text('${catalog.activeFilters}'),
                   child: const Icon(Icons.tune, size: 18),
                 ),
                 label: const Text('Фильтры'),
@@ -300,15 +308,16 @@ String _priceLabel(CatalogFilter filter) {
 
 class _CatalogContent extends StatelessWidget {
   final CatalogModel catalog;
+  final String basePath;
 
-  const _CatalogContent({required this.catalog});
+  const _CatalogContent({required this.catalog, required this.basePath});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final products = catalog.products;
-    final filtered = catalog.search.isNotEmpty || catalog.filter.activeCount > 0;
+    final filtered = catalog.search.isNotEmpty || catalog.activeFilters > 0;
 
     if (products.isEmpty) {
       return Center(
@@ -322,7 +331,7 @@ class _CatalogContent extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: text.titleMedium,
               ),
-              if (catalog.filter.activeCount > 0) ...[
+              if (catalog.activeFilters > 0) ...[
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () => context
@@ -337,43 +346,37 @@ class _CatalogContent extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: products.length + 1 + (catalog.hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               catalog.facets.total > 0
                   ? 'Найдено товаров: ${catalog.facets.total}'
                   : 'Показано товаров: ${products.length}',
               style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            itemCount: products.length + (catalog.hasMore ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == products.length) return _ListTail(catalog: catalog);
-              final product = products[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ProductCard(
-                  key: ValueKey(product.id),
-                  product: product,
-                  onTap: () {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    context.push('/catalog/${product.id}');
-                  },
-                ),
-              );
+          );
+        }
+        if (index == products.length + 1) return _ListTail(catalog: catalog);
+        final product = products[index - 1];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ProductCard(
+            key: ValueKey(product.id),
+            product: product,
+            storeId: catalog.storeId,
+            onTap: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              context.push('$basePath/${product.id}');
             },
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

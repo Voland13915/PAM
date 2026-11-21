@@ -5,17 +5,23 @@ import 'screens/login_screen.dart';
 import 'screens/product_details_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart'; // [шаг 5]
+import 'screens/savings_screen.dart';
 import 'screens/shopping_list_screen.dart';
+import 'screens/store_catalog_screen.dart';
 import 'screens/stores_screen.dart';
 import 'screens/track_price_screen.dart'; // [шаг 6]
 import 'screens/wishlist_screen.dart';
 import 'widgets/app_shell.dart';
 
+String _withParameters(String path, GoRouterState state) => path.replaceAllMapped(
+    RegExp(r':(\w+)'), (m) => state.pathParameters[m[1]] ?? m[0]!);
+
 GoRoute _productRoute(String base) => GoRoute(
       path: ':id',
       builder: (context, state) {
         final id = int.parse(state.pathParameters['id']!);
-        return ProductDetailsScreen(productId: id, basePath: base);
+        return ProductDetailsScreen(
+            productId: id, basePath: _withParameters(base, state));
       },
       routes: [
         GoRoute(
@@ -74,8 +80,22 @@ GoRouter createRouter(String initialLocation) => GoRouter(
             builder: (context, state) => const ProfileScreen(),
             routes: [
               GoRoute(
+                path: 'savings',
+                builder: (context, state) => const SavingsScreen(),
+                routes: [_productRoute('/profile/savings')],
+              ),
+              GoRoute(
                 path: 'stores',
                 builder: (context, state) => const StoresScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':storeId',
+                    builder: (context, state) => StoreCatalogScreen(
+                      storeId: int.parse(state.pathParameters['storeId']!),
+                    ),
+                    routes: [_productRoute('/profile/stores/:storeId')],
+                  ),
+                ],
               ),
             ],
           ),

@@ -12,6 +12,26 @@ String formatNumber(double value) {
 
 String formatPrice(double value) => '${formatNumber(value)}${_nbsp}MDL';
 
+String formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes$_nbspБ';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).round()}$_nbspКБ';
+  final mb = (bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',');
+  return '$mb$_nbspМБ';
+}
+
+String formatPercent(double value) =>
+    '${value.toStringAsFixed(value < 10 ? 1 : 0).replaceAll('.', ',')}$_nbsp%';
+
+String itemsWord(int count) {
+  final n = count % 100;
+  if (n >= 11 && n <= 14) return 'товаров';
+  return switch (count % 10) {
+    1 => 'товар',
+    2 || 3 || 4 => 'товара',
+    _ => 'товаров',
+  };
+}
+
 String storesWord(int count) => count == 1 ? 'магазине' : 'магазинах';
 
 const _months = [

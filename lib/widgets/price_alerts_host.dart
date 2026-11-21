@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import '../data/token_store.dart';
+import '../models/app_settings.dart';
 import '../models/wishlist_model.dart';
 import '../router.dart';
 import '../services/background.dart';
@@ -27,6 +28,7 @@ class PriceAlertsHost extends StatefulWidget {
 class _PriceAlertsHostState extends State<PriceAlertsHost> {
   late final AppLifecycleListener _lifecycle;
   WishlistModel? _wishlist;
+  AppSettings? _settings;
   bool _started = false;
   bool _checking = false;
 
@@ -51,11 +53,29 @@ class _PriceAlertsHostState extends State<PriceAlertsHost> {
       _wishlist?.removeListener(_onWishlistChanged);
       _wishlist = wishlist..addListener(_onWishlistChanged);
     }
+    final settings = context.read<AppSettings?>();
+    if (!identical(settings, _settings)) {
+      _settings?.removeListener(_onSettingsChanged);
+      _settings = settings?..addListener(_onSettingsChanged);
+    }
+  }
+
+  bool get _enabled => _settings?.notifications ?? true;
+
+  void _onSettingsChanged() {
+    if (_enabled) {
+      _onWishlistChanged();
+    } else if (_started) {
+      _started = false;
+      cancelBackgroundChecks().catchError(
+          (Object error) => debugPrint('Фоновая проверка не остановлена: $error'));
+    }
   }
 
   @override
   void dispose() {
     _wishlist?.removeListener(_onWishlistChanged);
+    _settings?.removeListener(_onSettingsChanged);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -63,6 +83,7 @@ class _PriceAlertsHostState extends State<PriceAlertsHost> {
   void _openProduct(int productId) => router.push('/wishlist/$productId');
 
   void _onWishlistChanged() {
+    if (!_enabled) return;
     final watching = _wishlist?.items.any((i) => i.notify) ?? false;
     if (!watching) return;
     _start();
@@ -83,7 +104,7 @@ class _PriceAlertsHostState extends State<PriceAlertsHost> {
   }
 
   Future<void> _check() async {
-    if (_checking) return;
+    if (_checking || !_enabled) return;
     _checking = true;
     try {
       final sent = await runPriceCheck(widget.apiBase, tokens: widget.tokens);

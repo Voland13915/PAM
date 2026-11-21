@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../utils/formatters.dart';
+import 'flexible_tile.dart';
 
 class PriceRow extends StatelessWidget {
   final String label;
@@ -38,7 +40,7 @@ class PriceRow extends StatelessWidget {
             ? scheme.primary
             : scheme.onSurface;
 
-    return ListTile(
+    return FlexibleTile(
       onTap: onTap,
       leading: Icon(
         isBest ? Icons.verified : Icons.storefront_outlined,

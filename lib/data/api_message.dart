@@ -10,6 +10,7 @@ String apiMessage(http.Response res) {
     return switch (code) {
       'VALIDATION_ERROR' => 'Отправленные данные недействительны',
       'UNAUTHORIZED' => 'Неверный email или пароль',
+      'WRONG_PASSWORD' => 'Текущий пароль указан неверно',
       'EMAIL_TAKEN' => 'Аккаунт с этим email уже существует',
       'NOT_FOUND' => 'Запись не существует',
       _ => 'Ошибка сервера ($code)',

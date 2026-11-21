@@ -100,49 +100,61 @@ class _SyncCardState extends State<SyncCard> {
     final scheme = Theme.of(context).colorScheme;
     final status = _status;
     final running = status?.running ?? false;
+    final compact = MediaQuery.sizeOf(context).width < 360 ||
+        MediaQuery.textScalerOf(context).scale(10) > 13;
+
+    final info = Row(
+      children: [
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: running
+              ? const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+              : Icon(Icons.schedule, color: scheme.onSecondaryContainer),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Обновление цен',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                status != null ? _subtitle(status) : (_error ?? 'Загрузка…'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final button = FilledButton.tonal(
+      onPressed: running || _starting || status == null ? null : _start,
+      child: const Text('Обновить'),
+    );
 
     return Card(
       color: scheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 32,
-              height: 32,
-              child: running
-                  ? const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    )
-                  : Icon(Icons.schedule, color: scheme.onSecondaryContainer),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [info, const SizedBox(height: 8), button],
+              )
+            : Row(
                 children: [
-                  Text(
-                    'Обновление цен',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    status != null
-                        ? _subtitle(status)
-                        : (_error ?? 'Загрузка…'),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Expanded(child: info),
+                  const SizedBox(width: 8),
+                  button,
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.tonal(
-              onPressed: running || _starting || status == null ? null : _start,
-              child: const Text('Обновить'),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -93,6 +93,19 @@ class ResponseCache {
     }
   }
 
+  Future<int> size() async {
+    try {
+      final dir = await _folder();
+      var total = 0;
+      await for (final entity in dir.list()) {
+        if (entity is File) total += await entity.length();
+      }
+      return total;
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
   Future<void> clear() async {
     try {
       final dir = await _folder();

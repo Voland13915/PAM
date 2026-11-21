@@ -49,6 +49,7 @@ class ApiClient {
         'GET' => http.get(uri, headers: headers),
         'POST' => http.post(uri, headers: headers, body: encoded),
         'PUT' => http.put(uri, headers: headers, body: encoded),
+        'PATCH' => http.patch(uri, headers: headers, body: encoded),
         'DELETE' => http.delete(uri, headers: headers),
         _ => throw ArgumentError('Неизвестный метод $method'),
       }
